@@ -1,0 +1,1214 @@
+{
+  "users": [
+    {
+      "id": "user_admin",
+      "name": "Admin Officer",
+      "email": "admin@transformai.gov",
+      "role": "ADMIN",
+      "passwordHash": "2565a38579d24bd71c67708ac75e06de:6f2ca582f7a6377dfe65d559ee4aa978501d79a2e7d39ef1ee13e485eb017880029d0aa1c6b694360e555ce02162c83ccd88130f7e85a8e6a9af8427c321f7c8",
+      "createdAt": "2026-08-25T14:39:50.449Z"
+    },
+    {
+      "id": "user_officer",
+      "name": "Demo Officer",
+      "email": "officer@transformai.gov",
+      "role": "OFFICER",
+      "passwordHash": "66c2a3582fdb142e6f012d392b624e0c:bfcac0e3b43befeaa99db4f5e9ddeb07ae0e9ddd561658ea57007cf5d203760c1e56938e4b97b609ee598186467245b6baa7e0632b135f65094bb0e9d745729c",
+      "createdAt": "2026-08-25T14:39:50.508Z"
+    }
+  ],
+  "documents": [
+    {
+      "id": "doc_qsuk8eg7mt8ruar1",
+      "title": "Government Welfare Scheme Notification 2026",
+      "name": "Government welfare scheme notification.txt",
+      "text": "Government Welfare Scheme Notification 2026\nThe Department of Social Welfare launched the Suraksha Benefit Scheme on 1 August 2026. Eligible households with annual income below INR 2,50,000 may apply through district service centres. Applications close on 20 September 2026. The scheme provides a one-time benefit of INR 10,000 after verification. District officers must publish beneficiary lists within 30 days. [1] Section: Eligibility and Benefits.",
+      "fileType": "txt",
+      "pages": 1,
+      "department": "Social Welfare",
+      "uploadedBy": "user_officer",
+      "metadata": {
+        "originalName": "Government welfare scheme notification.txt",
+        "mimeType": "text/plain",
+        "parser": "text-extractor"
+      },
+      "createdAt": "2026-08-25T14:39:50.509Z",
+      "intelligence": {
+        "wordCount": 64,
+        "pages": 1,
+        "detectedLanguage": "English",
+        "claimCount": 7,
+        "entityCount": 12,
+        "citationCount": 1,
+        "topics": [
+          "scheme",
+          "welfare",
+          "benefit",
+          "district",
+          "government",
+          "notification",
+          "department",
+          "social"
+        ],
+        "dates": [
+          "2026",
+          "1 August 2026",
+          "20 September 2026"
+        ],
+        "numbers": [
+          "2026",
+          "1",
+          "INR 2,50,000",
+          "20",
+          "INR 10,000",
+          "30 days"
+        ],
+        "risks": [
+          "District officers must publish beneficiary lists within 30 days."
+        ]
+      },
+      "status": "Analyzed",
+      "demo": true
+    },
+    {
+      "id": "doc_9am8qzznmt8ruar7",
+      "title": "District Disaster Management Authority Cyclone Preparedness Alert",
+      "name": "District disaster weather alert.txt",
+      "text": "District Disaster Management Authority Cyclone Preparedness Alert\nIssued on 20 September 2026 for coastal blocks. Citizens in low-lying areas must move to shelters by 6 PM. Emergency helpline 1077 will operate continuously. Fishing activity is suspended until 22 September 2026. Schools in affected blocks remain closed on 21 September 2026. [1] Section: Public Safety Advisory.",
+      "fileType": "txt",
+      "pages": 1,
+      "department": "Disaster Management",
+      "uploadedBy": "user_officer",
+      "metadata": {
+        "originalName": "District disaster weather alert.txt",
+        "mimeType": "text/plain",
+        "parser": "text-extractor"
+      },
+      "createdAt": "2026-08-25T14:39:50.515Z",
+      "intelligence": {
+        "wordCount": 55,
+        "pages": 1,
+        "detectedLanguage": "English",
+        "claimCount": 7,
+        "entityCount": 8,
+        "citationCount": 1,
+        "topics": [
+          "september",
+          "blocks",
+          "district",
+          "disaster",
+          "management",
+          "authority",
+          "cyclone",
+          "preparedness"
+        ],
+        "dates": [
+          "20 September 2026",
+          "22 September 2026",
+          "21 September 2026"
+        ],
+        "numbers": [
+          "20",
+          "2026",
+          "6 PM",
+          "1077",
+          "22",
+          "21",
+          "1"
+        ],
+        "risks": [
+          "District Disaster Management Authority Cyclone Preparedness Alert",
+          "Citizens in low-lying areas must move to shelters by 6 PM.",
+          "Emergency helpline 1077 will operate continuously.",
+          "Fishing activity is suspended until 22 September 2026."
+        ]
+      },
+      "status": "Analyzed",
+      "demo": true
+    },
+    {
+      "id": "doc_047tgjirmt8ruar8",
+      "title": "Education Department Digital Learning Policy 2026",
+      "name": "Education policy document.txt",
+      "text": "Education Department Digital Learning Policy 2026\nThe policy provides tablets to students of classes 9 to 12 in government schools. Schools must complete beneficiary verification by 15 October 2026. District officers must submit implementation reports every month. Budget allocation is INR 10 crore for phase one. [1] Section: Implementation Guidelines.",
+      "fileType": "txt",
+      "pages": 1,
+      "department": "Education",
+      "uploadedBy": "user_officer",
+      "metadata": {
+        "originalName": "Education policy document.txt",
+        "mimeType": "text/plain",
+        "parser": "text-extractor"
+      },
+      "createdAt": "2026-08-25T14:39:50.516Z",
+      "intelligence": {
+        "wordCount": 50,
+        "pages": 1,
+        "detectedLanguage": "English",
+        "claimCount": 6,
+        "entityCount": 7,
+        "citationCount": 1,
+        "topics": [
+          "policy",
+          "schools",
+          "must",
+          "implementation",
+          "education",
+          "department",
+          "digital",
+          "learning"
+        ],
+        "dates": [
+          "2026",
+          "15 October 2026"
+        ],
+        "numbers": [
+          "2026",
+          "9",
+          "12",
+          "15",
+          "INR 10 crore",
+          "1"
+        ],
+        "risks": [
+          "Schools must complete beneficiary verification by 15 October 2026.",
+          "District officers must submit implementation reports every month."
+        ]
+      },
+      "status": "Analyzed",
+      "demo": true
+    }
+  ],
+  "document_chunks": [
+    {
+      "id": "chunk_r1iym64ymt8ruar1",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "index": 0,
+      "page": 1,
+      "section": "Title / Overview",
+      "text": "Government Welfare Scheme Notification 2026\nThe Department of Social Welfare launched the Suraksha Benefit Scheme on 1 August 2026.",
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "chunk_mloxyzcpmt8ruar2",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "index": 1,
+      "page": 1,
+      "section": "Eligibility",
+      "text": "Eligible households with annual income below INR 2,50,000 may apply through district service centres.",
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "chunk_ch0z76tumt8ruar2",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "index": 2,
+      "page": 1,
+      "section": "Deadlines",
+      "text": "Applications close on 20 September 2026.",
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "chunk_rlxdp5o7mt8ruar2",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "index": 3,
+      "page": 1,
+      "section": "Financial Details",
+      "text": "The scheme provides a one-time benefit of INR 10,000 after verification.",
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "chunk_09ywp1mrmt8ruar2",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "index": 4,
+      "page": 1,
+      "section": "Eligibility",
+      "text": "District officers must publish beneficiary lists within 30 days. [1] Section: Eligibility and Benefits.",
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "chunk_e3492ojqmt8ruar7",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "index": 0,
+      "page": 1,
+      "section": "Title / Overview",
+      "text": "District Disaster Management Authority Cyclone Preparedness Alert\nIssued on 20 September 2026 for coastal blocks.",
+      "createdAt": "2026-08-25T14:39:50.515Z"
+    },
+    {
+      "id": "chunk_v4vptiqamt8ruar7",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "index": 1,
+      "page": 1,
+      "section": "Deadlines",
+      "text": "Citizens in low-lying areas must move to shelters by 6 PM.",
+      "createdAt": "2026-08-25T14:39:50.515Z"
+    },
+    {
+      "id": "chunk_zpxgj9ngmt8ruar7",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "index": 2,
+      "page": 1,
+      "section": "Risk / Advisory",
+      "text": "Emergency helpline 1077 will operate continuously.",
+      "createdAt": "2026-08-25T14:39:50.515Z"
+    },
+    {
+      "id": "chunk_ntz58i0rmt8ruar7",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "index": 3,
+      "page": 1,
+      "section": "Risk / Advisory",
+      "text": "Fishing activity is suspended until 22 September 2026.",
+      "createdAt": "2026-08-25T14:39:50.515Z"
+    },
+    {
+      "id": "chunk_74roelwdmt8ruar7",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "index": 4,
+      "page": 1,
+      "section": "Deadlines",
+      "text": "Schools in affected blocks remain closed on 21 September 2026. [1] Section: Public Safety Advisory.",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "chunk_b5ji4r7pmt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "index": 0,
+      "page": 1,
+      "section": "Title / Overview",
+      "text": "Education Department Digital Learning Policy 2026\nThe policy provides tablets to students of classes 9 to 12 in government schools.",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "chunk_omebncbjmt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "index": 1,
+      "page": 1,
+      "section": "Deadlines",
+      "text": "Schools must complete beneficiary verification by 15 October 2026.",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "chunk_8rcdbiylmt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "index": 2,
+      "page": 1,
+      "section": "Source Section",
+      "text": "District officers must submit implementation reports every month.",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "chunk_21mx5tllmt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "index": 3,
+      "page": 1,
+      "section": "Financial Details",
+      "text": "Budget allocation is INR 10 crore for phase one. [1] Section: Implementation Guidelines.",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    }
+  ],
+  "document_facts": [
+    {
+      "id": "fact_mo1qx48smt8ruar2",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "claim": "Government Welfare Scheme Notification 2026",
+      "citationId": "C1",
+      "page": 1,
+      "section": "Title / Overview",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "fact_c6ak23dgmt8ruar2",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "claim": "The Department of Social Welfare launched the Suraksha Benefit Scheme on 1 August 2026.",
+      "citationId": "C2",
+      "page": 1,
+      "section": "Eligibility",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "fact_7yc0wk5mmt8ruar2",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "claim": "Eligible households with annual income below INR 2,50,000 may apply through district service centres.",
+      "citationId": "C3",
+      "page": 1,
+      "section": "Deadlines",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "fact_xpl6frc8mt8ruar2",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "claim": "Applications close on 20 September 2026.",
+      "citationId": "C4",
+      "page": 1,
+      "section": "Financial Details",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "fact_q9mljbqimt8ruar2",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "claim": "The scheme provides a one-time benefit of INR 10,000 after verification.",
+      "citationId": "C5",
+      "page": 1,
+      "section": "Eligibility",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "fact_cj876jyfmt8ruar2",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "claim": "District officers must publish beneficiary lists within 30 days.",
+      "citationId": "C6",
+      "page": 1,
+      "section": "Eligibility",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "fact_gb3loynkmt8ruar2",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "claim": "[1] Section: Eligibility and Benefits.",
+      "citationId": "C7",
+      "page": 1,
+      "section": "Eligibility",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.510Z"
+    },
+    {
+      "id": "fact_hwqztst0mt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "claim": "District Disaster Management Authority Cyclone Preparedness Alert",
+      "citationId": "C1",
+      "page": 1,
+      "section": "Title / Overview",
+      "confidence": 0.84,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_wuwf7hacmt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "claim": "Issued on 20 September 2026 for coastal blocks.",
+      "citationId": "C2",
+      "page": 1,
+      "section": "Deadlines",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_9zsuan0cmt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "claim": "Citizens in low-lying areas must move to shelters by 6 PM.",
+      "citationId": "C3",
+      "page": 1,
+      "section": "Risk / Advisory",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_ueem7t9bmt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "claim": "Emergency helpline 1077 will operate continuously.",
+      "citationId": "C4",
+      "page": 1,
+      "section": "Risk / Advisory",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_ky2rnxmkmt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "claim": "Fishing activity is suspended until 22 September 2026.",
+      "citationId": "C5",
+      "page": 1,
+      "section": "Deadlines",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_s2r7k534mt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "claim": "Schools in affected blocks remain closed on 21 September 2026.",
+      "citationId": "C6",
+      "page": 1,
+      "section": "Deadlines",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_alolc3fsmt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "claim": "[1] Section: Public Safety Advisory.",
+      "citationId": "C7",
+      "page": 1,
+      "section": "Deadlines",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_1fe7yz7amt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "claim": "Education Department Digital Learning Policy 2026",
+      "citationId": "C1",
+      "page": 1,
+      "section": "Title / Overview",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_zxr542jtmt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "claim": "The policy provides tablets to students of classes 9 to 12 in government schools.",
+      "citationId": "C2",
+      "page": 1,
+      "section": "Deadlines",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_rgb5vt38mt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "claim": "Schools must complete beneficiary verification by 15 October 2026.",
+      "citationId": "C3",
+      "page": 1,
+      "section": "Source Section",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_ezquffwjmt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "claim": "District officers must submit implementation reports every month.",
+      "citationId": "C4",
+      "page": 1,
+      "section": "Financial Details",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_9o8mm814mt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "claim": "Budget allocation is INR 10 crore for phase one.",
+      "citationId": "C5",
+      "page": 1,
+      "section": "Financial Details",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "fact_0hf3hwycmt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "claim": "[1] Section: Implementation Guidelines.",
+      "citationId": "C6",
+      "page": 1,
+      "section": "Financial Details",
+      "confidence": 0.94,
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    }
+  ],
+  "document_entities": [
+    {
+      "id": "entity_0qtn8ulpmt8ruar3",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "Government Welfare Scheme Notification",
+      "type": "Program / Document",
+      "createdAt": "2026-08-25T14:39:50.511Z"
+    },
+    {
+      "id": "entity_dvpygzsvmt8ruar3",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "The Department",
+      "type": "Organization",
+      "createdAt": "2026-08-25T14:39:50.511Z"
+    },
+    {
+      "id": "entity_act7zhgomt8ruar3",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "Social Welfare",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.511Z"
+    },
+    {
+      "id": "entity_3o59lm04mt8ruar3",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "Suraksha Benefit Scheme",
+      "type": "Program / Document",
+      "createdAt": "2026-08-25T14:39:50.511Z"
+    },
+    {
+      "id": "entity_mne2o3xgmt8ruar3",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "August",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.511Z"
+    },
+    {
+      "id": "entity_mdx5nz3kmt8ruar4",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "Eligible",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.512Z"
+    },
+    {
+      "id": "entity_s8nggm01mt8ruar4",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "INR",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.512Z"
+    },
+    {
+      "id": "entity_w1d9nhg7mt8ruar4",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "Applications",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.512Z"
+    },
+    {
+      "id": "entity_uh05wve3mt8ruar4",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "September",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.512Z"
+    },
+    {
+      "id": "entity_5zjxalvkmt8ruar4",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "District",
+      "type": "Location",
+      "createdAt": "2026-08-25T14:39:50.512Z"
+    },
+    {
+      "id": "entity_l523c70omt8ruar4",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "Eligibility",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.512Z"
+    },
+    {
+      "id": "entity_hungc0ekmt8ruar4",
+      "documentId": "doc_qsuk8eg7mt8ruar1",
+      "name": "Benefits",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.512Z"
+    },
+    {
+      "id": "entity_qfy0q17pmt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "name": "District Disaster Management Authority Cyclone Preparedness",
+      "type": "Organization",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_29kqmfaimt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "name": "Alert\nIssued",
+      "type": "Program / Document",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_v7dhyhpimt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "name": "September",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_0cy9akshmt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "name": "Citizens",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_wt5mrswamt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "name": "Emergency",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_saua3gh5mt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "name": "Fishing",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_oqweyt3rmt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "name": "Schools",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_72jy5lctmt8ruar8",
+      "documentId": "doc_9am8qzznmt8ruar7",
+      "name": "Public Safety Advisory",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_ts9na3jtmt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "name": "Education Department Digital Learning Policy",
+      "type": "Organization",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_qf9x6usomt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "name": "Schools",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_j6ncprzsmt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "name": "October",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_z6nh15t4mt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "name": "District",
+      "type": "Location",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_ljql75hymt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "name": "Budget",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_n00waq5cmt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "name": "INR",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "entity_1w048urcmt8ruar8",
+      "documentId": "doc_047tgjirmt8ruar8",
+      "name": "Implementation Guidelines",
+      "type": "Entity",
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    }
+  ],
+  "transformations": [],
+  "transformation_versions": [],
+  "generated_outputs": [
+    {
+      "id": "out_9yxfzqqymt8ruar6",
+      "documentIds": [
+        "doc_qsuk8eg7mt8ruar1"
+      ],
+      "title": "Citizen Simplifier for Citizen",
+      "outputType": "Citizen Simplifier",
+      "audience": "Citizen",
+      "tone": "Simple",
+      "language": "English",
+      "channel": "Website",
+      "content": "Citizen Simplifier for Citizen\n\n1. Government Welfare Scheme Notification 2026 [1]\n2. The Department of Social Welfare launched the Suraksha Benefit Scheme on 1 August 2026. [2]\n3. Eligible households with annual income below INR 2,50,000 may apply through district service centres. [3]\n4. Applications close on 20 September 2026. [4]\n5. The scheme provides a one-time benefit of INR 10,000 after verification. [5]\n6. District officers must publish beneficiary lists within 30 days. [6]\n7. Section: Eligibility and Benefits. [7]\n\nRecommended communication objective: deliver accurate, source-grounded information in a simple tone for Website.",
+      "provider": "demo",
+      "citationMap": [
+        {
+          "marker": "[1]",
+          "factId": "fact_mo1qx48smt8ruar2",
+          "page": 1,
+          "section": "Title / Overview",
+          "source": "Government Welfare Scheme Notification 2026"
+        },
+        {
+          "marker": "[2]",
+          "factId": "fact_c6ak23dgmt8ruar2",
+          "page": 1,
+          "section": "Eligibility",
+          "source": "The Department of Social Welfare launched the Suraksha Benefit Scheme on 1 August 2026."
+        },
+        {
+          "marker": "[3]",
+          "factId": "fact_7yc0wk5mmt8ruar2",
+          "page": 1,
+          "section": "Deadlines",
+          "source": "Eligible households with annual income below INR 2,50,000 may apply through district service centres."
+        },
+        {
+          "marker": "[4]",
+          "factId": "fact_xpl6frc8mt8ruar2",
+          "page": 1,
+          "section": "Financial Details",
+          "source": "Applications close on 20 September 2026."
+        },
+        {
+          "marker": "[5]",
+          "factId": "fact_q9mljbqimt8ruar2",
+          "page": 1,
+          "section": "Eligibility",
+          "source": "The scheme provides a one-time benefit of INR 10,000 after verification."
+        },
+        {
+          "marker": "[6]",
+          "factId": "fact_cj876jyfmt8ruar2",
+          "page": 1,
+          "section": "Eligibility",
+          "source": "District officers must publish beneficiary lists within 30 days."
+        },
+        {
+          "marker": "[7]",
+          "factId": "fact_gb3loynkmt8ruar2",
+          "page": 1,
+          "section": "Eligibility",
+          "source": "[1] Section: Eligibility and Benefits."
+        }
+      ],
+      "createdAt": "2026-08-25T14:39:50.514Z",
+      "version": 1,
+      "demo": true,
+      "factualityScore": 88,
+      "citationCoverage": 88
+    },
+    {
+      "id": "out_un4qxknamt8ruar8",
+      "documentIds": [
+        "doc_9am8qzznmt8ruar7"
+      ],
+      "title": "Citizen Simplifier for Citizen",
+      "outputType": "Citizen Simplifier",
+      "audience": "Citizen",
+      "tone": "Simple",
+      "language": "English",
+      "channel": "Website",
+      "content": "Citizen Simplifier for Citizen\n\n1. District Disaster Management Authority Cyclone Preparedness Alert [1]\n2. Issued on 20 September 2026 for coastal blocks. [2]\n3. Citizens in low-lying areas must move to shelters by 6 PM. [3]\n4. Emergency helpline 1077 will operate continuously. [4]\n5. Fishing activity is suspended until 22 September 2026. [5]\n6. Schools in affected blocks remain closed on 21 September 2026. [6]\n7. Section: Public Safety Advisory. [7]\n\nRecommended communication objective: deliver accurate, source-grounded information in a simple tone for Website.",
+      "provider": "demo",
+      "citationMap": [
+        {
+          "marker": "[1]",
+          "factId": "fact_hwqztst0mt8ruar8",
+          "page": 1,
+          "section": "Title / Overview",
+          "source": "District Disaster Management Authority Cyclone Preparedness Alert"
+        },
+        {
+          "marker": "[2]",
+          "factId": "fact_wuwf7hacmt8ruar8",
+          "page": 1,
+          "section": "Deadlines",
+          "source": "Issued on 20 September 2026 for coastal blocks."
+        },
+        {
+          "marker": "[3]",
+          "factId": "fact_9zsuan0cmt8ruar8",
+          "page": 1,
+          "section": "Risk / Advisory",
+          "source": "Citizens in low-lying areas must move to shelters by 6 PM."
+        },
+        {
+          "marker": "[4]",
+          "factId": "fact_ueem7t9bmt8ruar8",
+          "page": 1,
+          "section": "Risk / Advisory",
+          "source": "Emergency helpline 1077 will operate continuously."
+        },
+        {
+          "marker": "[5]",
+          "factId": "fact_ky2rnxmkmt8ruar8",
+          "page": 1,
+          "section": "Deadlines",
+          "source": "Fishing activity is suspended until 22 September 2026."
+        },
+        {
+          "marker": "[6]",
+          "factId": "fact_s2r7k534mt8ruar8",
+          "page": 1,
+          "section": "Deadlines",
+          "source": "Schools in affected blocks remain closed on 21 September 2026."
+        },
+        {
+          "marker": "[7]",
+          "factId": "fact_alolc3fsmt8ruar8",
+          "page": 1,
+          "section": "Deadlines",
+          "source": "[1] Section: Public Safety Advisory."
+        }
+      ],
+      "createdAt": "2026-08-25T14:39:50.516Z",
+      "version": 1,
+      "demo": true,
+      "factualityScore": 100,
+      "citationCoverage": 88
+    },
+    {
+      "id": "out_8ko4wmtvmt8ruar9",
+      "documentIds": [
+        "doc_047tgjirmt8ruar8"
+      ],
+      "title": "Citizen Simplifier for Citizen",
+      "outputType": "Citizen Simplifier",
+      "audience": "Citizen",
+      "tone": "Simple",
+      "language": "English",
+      "channel": "Website",
+      "content": "Citizen Simplifier for Citizen\n\n1. Education Department Digital Learning Policy 2026 [1]\n2. The policy provides tablets to students of classes 9 to 12 in government schools. [2]\n3. Schools must complete beneficiary verification by 15 October 2026. [3]\n4. District officers must submit implementation reports every month. [4]\n5. Budget allocation is INR 10 crore for phase one. [5]\n6. Section: Implementation Guidelines. [6]\n\nRecommended communication objective: deliver accurate, source-grounded information in a simple tone for Website.",
+      "provider": "demo",
+      "citationMap": [
+        {
+          "marker": "[1]",
+          "factId": "fact_1fe7yz7amt8ruar8",
+          "page": 1,
+          "section": "Title / Overview",
+          "source": "Education Department Digital Learning Policy 2026"
+        },
+        {
+          "marker": "[2]",
+          "factId": "fact_zxr542jtmt8ruar8",
+          "page": 1,
+          "section": "Deadlines",
+          "source": "The policy provides tablets to students of classes 9 to 12 in government schools."
+        },
+        {
+          "marker": "[3]",
+          "factId": "fact_rgb5vt38mt8ruar8",
+          "page": 1,
+          "section": "Source Section",
+          "source": "Schools must complete beneficiary verification by 15 October 2026."
+        },
+        {
+          "marker": "[4]",
+          "factId": "fact_ezquffwjmt8ruar8",
+          "page": 1,
+          "section": "Financial Details",
+          "source": "District officers must submit implementation reports every month."
+        },
+        {
+          "marker": "[5]",
+          "factId": "fact_9o8mm814mt8ruar8",
+          "page": 1,
+          "section": "Financial Details",
+          "source": "Budget allocation is INR 10 crore for phase one."
+        },
+        {
+          "marker": "[6]",
+          "factId": "fact_0hf3hwycmt8ruar8",
+          "page": 1,
+          "section": "Financial Details",
+          "source": "[1] Section: Implementation Guidelines."
+        }
+      ],
+      "createdAt": "2026-08-25T14:39:50.517Z",
+      "version": 1,
+      "demo": true,
+      "factualityScore": 86,
+      "citationCoverage": 86
+    }
+  ],
+  "citations": [],
+  "verification_results": [
+    {
+      "id": "verify_4nurs019mt8ruar7",
+      "outputId": "out_9yxfzqqymt8ruar6",
+      "factualityScore": 88,
+      "citationCoverage": 88,
+      "supported": 7,
+      "partial": 0,
+      "unsupported": 1,
+      "claims": [
+        {
+          "claim": "Citizen Simplifier for Citizen",
+          "status": "Unsupported",
+          "supportScore": 0,
+          "evidence": null,
+          "citation": null
+        },
+        {
+          "claim": "Government Welfare Scheme Notification 2026 [1]",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "Government Welfare Scheme Notification 2026",
+          "citation": {
+            "page": 1,
+            "section": "Title / Overview"
+          }
+        },
+        {
+          "claim": "The Department of Social Welfare launched the Suraksha Benefit Scheme on 1 August 2026.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "The Department of Social Welfare launched the Suraksha Benefit Scheme on 1 August 2026.",
+          "citation": {
+            "page": 1,
+            "section": "Eligibility"
+          }
+        },
+        {
+          "claim": "gible households with annual income below INR 2,50,000 may apply through district service centres.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "Eligible households with annual income below INR 2,50,000 may apply through district service centres.",
+          "citation": {
+            "page": 1,
+            "section": "Deadlines"
+          }
+        },
+        {
+          "claim": "pplications close on 20 September 2026.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "Applications close on 20 September 2026.",
+          "citation": {
+            "page": 1,
+            "section": "Financial Details"
+          }
+        },
+        {
+          "claim": "The scheme provides a one-time benefit of INR 10,000 after verification.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "The scheme provides a one-time benefit of INR 10,000 after verification.",
+          "citation": {
+            "page": 1,
+            "section": "Eligibility"
+          }
+        },
+        {
+          "claim": "trict officers must publish beneficiary lists within 30 days.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "District officers must publish beneficiary lists within 30 days.",
+          "citation": {
+            "page": 1,
+            "section": "Eligibility"
+          }
+        },
+        {
+          "claim": "ction: Eligibility and Benefits.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "[1] Section: Eligibility and Benefits.",
+          "citation": {
+            "page": 1,
+            "section": "Eligibility"
+          }
+        }
+      ],
+      "createdAt": "2026-08-25T14:39:50.515Z"
+    },
+    {
+      "id": "verify_mmyb3k1ymt8ruar8",
+      "outputId": "out_un4qxknamt8ruar8",
+      "factualityScore": 100,
+      "citationCoverage": 88,
+      "supported": 8,
+      "partial": 0,
+      "unsupported": 0,
+      "claims": [
+        {
+          "claim": "Citizen Simplifier for Citizen",
+          "status": "Supported",
+          "supportScore": 50,
+          "evidence": "Citizens in low-lying areas must move to shelters by 6 PM.",
+          "citation": {
+            "page": 1,
+            "section": "Risk / Advisory"
+          }
+        },
+        {
+          "claim": "trict Disaster Management Authority Cyclone Preparedness Alert [1]",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "District Disaster Management Authority Cyclone Preparedness Alert",
+          "citation": {
+            "page": 1,
+            "section": "Title / Overview"
+          }
+        },
+        {
+          "claim": "ued on 20 September 2026 for coastal blocks.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "Issued on 20 September 2026 for coastal blocks.",
+          "citation": {
+            "page": 1,
+            "section": "Deadlines"
+          }
+        },
+        {
+          "claim": "Citizens in low-lying areas must move to shelters by 6 PM.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "Citizens in low-lying areas must move to shelters by 6 PM.",
+          "citation": {
+            "page": 1,
+            "section": "Risk / Advisory"
+          }
+        },
+        {
+          "claim": "mergency helpline 1077 will operate continuously.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "Emergency helpline 1077 will operate continuously.",
+          "citation": {
+            "page": 1,
+            "section": "Risk / Advisory"
+          }
+        },
+        {
+          "claim": "Fishing activity is suspended until 22 September 2026.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "Fishing activity is suspended until 22 September 2026.",
+          "citation": {
+            "page": 1,
+            "section": "Deadlines"
+          }
+        },
+        {
+          "claim": "chools in affected blocks remain closed on 21 September 2026.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "Schools in affected blocks remain closed on 21 September 2026.",
+          "citation": {
+            "page": 1,
+            "section": "Deadlines"
+          }
+        },
+        {
+          "claim": "ction: Public Safety Advisory.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "[1] Section: Public Safety Advisory.",
+          "citation": {
+            "page": 1,
+            "section": "Deadlines"
+          }
+        }
+      ],
+      "createdAt": "2026-08-25T14:39:50.516Z"
+    },
+    {
+      "id": "verify_w3ov9tznmt8ruar9",
+      "outputId": "out_8ko4wmtvmt8ruar9",
+      "factualityScore": 86,
+      "citationCoverage": 86,
+      "supported": 6,
+      "partial": 0,
+      "unsupported": 1,
+      "claims": [
+        {
+          "claim": "Citizen Simplifier for Citizen",
+          "status": "Unsupported",
+          "supportScore": 0,
+          "evidence": null,
+          "citation": null
+        },
+        {
+          "claim": "ucation Department Digital Learning Policy 2026 [1]",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "Education Department Digital Learning Policy 2026",
+          "citation": {
+            "page": 1,
+            "section": "Title / Overview"
+          }
+        },
+        {
+          "claim": "The policy provides tablets to students of classes 9 to 12 in government schools.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "The policy provides tablets to students of classes 9 to 12 in government schools.",
+          "citation": {
+            "page": 1,
+            "section": "Deadlines"
+          }
+        },
+        {
+          "claim": "chools must complete beneficiary verification by 15 October 2026.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "Schools must complete beneficiary verification by 15 October 2026.",
+          "citation": {
+            "page": 1,
+            "section": "Source Section"
+          }
+        },
+        {
+          "claim": "trict officers must submit implementation reports every month.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "District officers must submit implementation reports every month.",
+          "citation": {
+            "page": 1,
+            "section": "Financial Details"
+          }
+        },
+        {
+          "claim": "Budget allocation is INR 10 crore for phase one.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "Budget allocation is INR 10 crore for phase one.",
+          "citation": {
+            "page": 1,
+            "section": "Financial Details"
+          }
+        },
+        {
+          "claim": "ction: Implementation Guidelines.",
+          "status": "Supported",
+          "supportScore": 100,
+          "evidence": "[1] Section: Implementation Guidelines.",
+          "citation": {
+            "page": 1,
+            "section": "Financial Details"
+          }
+        }
+      ],
+      "createdAt": "2026-08-25T14:39:50.517Z"
+    }
+  ],
+  "templates": [
+    {
+      "id": "tpl_citizen",
+      "name": "Citizen Simplifier",
+      "category": "Public Communication"
+    },
+    {
+      "id": "tpl_officer",
+      "name": "Officer Brief",
+      "category": "Internal Briefing"
+    },
+    {
+      "id": "tpl_alert",
+      "name": "SMS / Alert",
+      "category": "Emergency"
+    }
+  ],
+  "usage_analytics": [],
+  "audit_logs": [
+    {
+      "id": "audit_1zgm83szmt8runxw",
+      "userId": "user_officer",
+      "action": "login",
+      "details": {},
+      "createdAt": "2026-08-25T14:40:07.604Z"
+    },
+    {
+      "id": "audit_nqovdlramt8rutgs",
+      "userId": "user_officer",
+      "action": "login",
+      "details": {},
+      "createdAt": "2026-08-25T14:40:14.764Z"
+    },
+    {
+      "id": "audit_isat70oqmt8s13tk",
+      "userId": "user_officer",
+      "action": "login",
+      "details": {},
+      "createdAt": "2026-08-25T14:45:08.120Z"
+    }
+  ]
+}

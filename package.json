@@ -1,0 +1,14 @@
+{
+  "name": "transformai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SIH26154 GenAI Platform for Automated Content Transformation",
+  "type": "module",
+  "scripts": {
+    "start": "node apps/api/server.js",
+    "test": "node tests/run-tests.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
