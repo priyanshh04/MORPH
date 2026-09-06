@@ -2,7 +2,7 @@ import { id, now } from "../database/store.js";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 
-const STOP = new Set("the and for with from this that have will are was were has into shall should would could about above below where which when what who whom your their there here been being through using under over such not its also than then them they you our out use can may per via a an as is of to in on at by or be it if how why does did do this these those what when where who which whose been being".split(" "));
+const STOP = new Set("the and for with from this that have will are was were has into shall should would could about above below where which when what who whom your their there here been being through using under over such not its also than then them they our out use can may per via a an as is of to in on at by or be it if how why does did do these those whose been being".split(" "));
 
 export function normalizeText(text = "") {
   let value = String(text)
@@ -158,6 +158,9 @@ function topTerms(text) {
 export function retrieve(chunks, question, limit = 4) {
   const questionTerms = tokenize(question);
   const questionText = String(question).toLowerCase();
+  const isDate = /\bwhen\b|\blaunched\b|\blaunch\b|\bstarted\b|\bbegan\b|\bintroduced\b|\bannounced\b|\bissued\b|\beffective\b|\bcommenced\b|\bdate\b|\byear\b/.test(questionText);
+  const isAmount = /\bhow much\b|\bamount\b|\bbudget\b|\bbenefit\b|\bcost\b|\bprice\b/.test(questionText);
+  const isDeadline = /\bdeadline\b|\bwhen.*close|\blast date\b|\bapply\b|\bsubmit\b|\bdue\b/.test(questionText);
   const scored = chunks.map((chunk) => {
     const hay = chunk.text.toLowerCase();
     const chunkTerms = tokenize(hay);
@@ -166,14 +169,26 @@ export function retrieve(chunks, question, limit = 4) {
       if (chunkTerms.has(term)) score += 3;
       else if (hay.includes(term)) score += 1;
     }
-    if (/\bwhen\b|\bdate\b|\blaunched\b|\bstarted\b/.test(questionText) && /launched|issued|started|began|\b20\d{2}\b|\b\d{1,2}\s+[A-Z][a-z]+\s+20\d{2}\b/i.test(hay)) score += 5;
-    if (/\bwho\b|\bdepartment\b|\bministry\b/.test(questionText) && /department|ministry|authority|organisation|organization/i.test(hay)) score += 4;
-    if (/\bhow much\b|\bamount\b|\bbudget\b|\bprice\b|\bbenefit\b/.test(questionText) && /INR|₹|crore|lakh|amount|benefit/i.test(hay)) score += 5;
-    if (/\bdeadline\b|\bwhen.*close|\blast date\b|\bapply\b/.test(questionText) && /close|deadline|apply|submit|\bby\b/i.test(hay)) score += 5;
-    if (/\beligib/.test(questionText) && /eligib|qualification|beneficiar/i.test(hay)) score += 5;
+    if (isDate && /launched|launch|issued|started|began|introduced|announced|effective|commenced/i.test(hay)) score += 12;
+    if (isDate && /\b\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+20\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b/.test(hay)) score += 30;
+    else if (isDate && /\b20\d{2}\b/.test(hay)) score += 8;
+    if (isAmount && /INR|₹|crore|lakh|amount|benefit|cost|price/i.test(hay)) score += 8;
+    if (isDeadline && /close|deadline|apply|submit|due|last date|by\b/i.test(hay)) score += 8;
+    if (/\beligible\b|\beligibility\b/.test(questionText) && /eligib|qualification|beneficiar/i.test(hay)) score += 8;
     const words = hay.split(/\s+/).filter(Boolean).length;
     if (words < 6 && /\d/.test(hay)) score -= 4;
+    if (/^newly launched scheme\s*[.·•_-]*$/i.test(chunk.text.trim())) score -= 100;
     return { ...chunk, score };
   });
-  return scored.sort((a, b) => b.score - a.score || a.index - b.index).slice(0, limit);
+
+  const ranked = scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  if (isDate) {
+    // Always include the strongest date-bearing evidence even when a noisy PDF title
+    // happens to match the question better than the actual sentence containing the date.
+    const dateEvidence = ranked.filter((x) => /\b\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+20\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b|\b20\d{2}\b/i.test(x.text));
+    const merged = [];
+    for (const item of [...dateEvidence, ...ranked]) if (!merged.some((x) => x.id === item.id)) merged.push(item);
+    return merged.slice(0, Math.max(limit, 8));
+  }
+  return ranked.slice(0, limit);
 }
