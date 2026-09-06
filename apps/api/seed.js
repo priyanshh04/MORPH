@@ -15,11 +15,9 @@ export async function ensureSeedData() {
   const db = await readDb();
   const seedDemo = String(process.env.SEED_DEMO || (!CONFIG.isProduction)).toLowerCase() === "true";
 
-  if (seedDemo && !db.users.length) {
-    db.users.push(
-      { id: "user_admin", name: "Admin Officer", email: "admin@transformai.gov", role: "ADMIN", passwordHash: hashPassword("Admin@123"), createdAt: now() },
-      { id: "user_officer", name: "Demo Officer", email: "officer@transformai.gov", role: "OFFICER", passwordHash: hashPassword("Officer@123"), createdAt: now() }
-    );
+  if (seedDemo) {
+    if (!db.users.some((u) => u.email.toLowerCase() === "admin@transformai.gov")) db.users.push({ id: "user_admin", name: "Admin Officer", email: "admin@transformai.gov", role: "ADMIN", passwordHash: hashPassword("Admin@123"), createdAt: now() });
+    if (!db.users.some((u) => u.email.toLowerCase() === "officer@transformai.gov")) db.users.push({ id: "user_officer", name: "Demo Officer", email: "officer@transformai.gov", role: "OFFICER", passwordHash: hashPassword("Officer@123"), createdAt: now() });
   }
 
   if (seedDemo && !db.documents.length) {
