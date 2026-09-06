@@ -28,7 +28,63 @@ function settings(){return `<div class="header"><div><h2>Settings</h2><p>Deploym
 function bind(){ $("#newBtn")?.addEventListener("click",()=>{state.view="new";render()}); $("#sample")?.addEventListener("click",()=>{state.activeDoc=state.docs[0];render()}); document.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>{state.activeDoc=state.docs.find(d=>d.id===b.dataset.pick);state.view="new";render()}); $("#upload")?.addEventListener("click",upload); $("#generate")?.addEventListener("click",generate); document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>copy(b.dataset.copy)); document.querySelectorAll("[data-save]").forEach(b=>b.onclick=()=>saveVersion(b.dataset.save)); document.querySelectorAll("[data-verify]").forEach(b=>b.onclick=()=>verify(b.dataset.verify)); document.querySelectorAll("[data-export]").forEach(b=>b.onclick=()=>exportOut(b.dataset.export,b.dataset.format)); $("#chatTab")?.addEventListener("click",chatPane); $("#compareTab")?.addEventListener("click",comparePane); const drop=$("#drop"); if(drop){drop.ondragover=e=>{e.preventDefault();drop.classList.add("active")};drop.ondragleave=()=>drop.classList.remove("active");drop.ondrop=e=>{e.preventDefault();drop.classList.remove("active");const f=e.dataTransfer.files[0];if(f){const input=$("#fileInput");const dt=new DataTransfer();dt.items.add(f);input.files=dt.files;}};} }
 async function upload(){const file=$("#fileInput")?.files[0];let body={department:"General"};if(file){body.name=file.name;body.type=file.type||"application/octet-stream";body.encoding="base64";body.content=await fileToBase64(file);}else{body.name="Pasted source.txt";body.type="text/plain";body.content=$("#sourceText").value;body.encoding="text";}if(!body.content)return toast("Choose a file or paste source text.");try{const r=await api("/api/documents/upload",{method:"POST",body});state.activeDoc=r.document;await refresh();state.view="new";toast("Document analyzed");render()}catch(e){toast(e.message)}}
 async function generate(){if(!state.activeDoc)return toast("Analyze a document first.");const btn=$("#generate");const body={documentIds:[state.activeDoc.id],outputTypes:[...document.querySelectorAll("[name=outputType]:checked")].map(x=>x.value),audience:$("#audience").value,tone:$("#tone").value,length:$("#length").value,channel:$("#channel").value,language:$("#language").value};if(!body.outputTypes.length)return toast("Select at least one output.");btn.disabled=true;btn.textContent="Generating...";try{await api("/api/transformations",{method:"POST",body});await refresh();toast("Outputs generated and verified");render()}catch(e){toast(e.message);btn.disabled=false;btn.textContent="Generate Selected Outputs"}}
-function chatPane(){const d=state.activeDoc;if(!d)return;$("#rightPane").innerHTML=`<h3>Chat with Document</h3><div class="chat-log">${state.chat.map(m=>`<div class="msg ${m.role}">${esc(m.text)}</div>`).join("")}</div><br><input id="question" placeholder="Ask a question about this document"><div class="actions"><button class="primary" id="ask">Ask</button></div>`;$("#ask").onclick=async()=>{const q=$("#question").value.trim();if(!q)return;state.chat.push({role:"user",text:q});chatPane();try{const r=await api(`/api/documents/${d.id}/chat`,{method:"POST",body:{question:q}});state.chat.push({role:"ai",text:`${r.answer}\n${(r.citations||[]).map(c=>`${c.marker} Page ${c.page}, ${c.section}`).join("\n")}`);chatPane()}catch(e){toast(e.message)}}}
+function chatPane() {
+  const d = state.activeDoc;
+  if (!d) return;
+
+  const messages = state.chat
+    .map(function (m) {
+      return '<div class="msg ' + m.role + '">' + esc(m.text) + '</div>';
+    })
+    .join("");
+
+  $("#rightPane").innerHTML =
+    "<h3>Chat with Document</h3>" +
+    '<div class="chat-log">' +
+    messages +
+    "</div>" +
+    "<br>" +
+    '<input id="question" placeholder="Ask a question about this document">' +
+    '<div class="actions">' +
+    '<button class="primary" id="ask">Ask</button>' +
+    "</div>";
+
+  $("#ask").onclick = async function () {
+    const q = $("#question").value.trim();
+    if (!q) return;
+
+    state.chat.push({
+      role: "user",
+      text: q
+    });
+
+    chatPane();
+
+    try {
+      const r = await api("/api/documents/" + d.id + "/chat", {
+        method: "POST",
+        body: {
+          question: q
+        }
+      });
+
+      const citations = (r.citations || [])
+        .map(function (c) {
+          return c.marker + " Page " + c.page + ", " + c.section;
+        })
+        .join("\n");
+
+      state.chat.push({
+        role: "ai",
+        text: r.answer + (citations ? "\n" + citations : "")
+      });
+
+      chatPane();
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+}
 function comparePane(){if(state.docs.length<2)return $("#rightPane").innerHTML='<p class="metric">Upload at least two documents to compare them.</p>';const opts=state.docs.map(d=>`<option value="${d.id}">${esc(d.title)}</option>`).join("");$("#rightPane").innerHTML=`<h3>Compare Documents</h3>${select("docA",[],"","",opts)}${select("docB",[],"","",opts)}<div class="actions"><button class="primary" id="compare">Compare</button></div><div id="compareResult"></div>`;$("#compare").onclick=async()=>{try{const r=await api("/api/documents/compare",{method:"POST",body:{documentIds:[$("#docA").value,$("#docB").value]}});$("#compareResult").innerHTML=`<h3>Added clauses</h3><div class="content">${esc(r.addedClauses.join("\n"))}</div><h3>Removed clauses</h3><div class="content">${esc(r.removedClauses.join("\n"))}</div><h3>Changed dates</h3><pre>${esc(JSON.stringify(r.changedDates,null,2))}</pre>`}catch(e){toast(e.message)}}}
 async function verify(id){try{const r=await api(`/api/transformations/${id}/verify`,{method:"POST",body:{}});toast(`Factuality ${r.factualityScore}% · unsupported ${r.unsupported}`)}catch(e){toast(e.message)}}
 async function saveVersion(id){const el=document.querySelector(`[data-edit="${id}"]`);try{await api(`/api/transformations/${id}/version`,{method:"POST",body:{content:el.innerText}});await refresh();toast("Version saved")}catch(e){toast(e.message)}}
