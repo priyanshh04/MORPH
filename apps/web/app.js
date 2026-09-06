@@ -1,379 +1,46 @@
-const state = {
-  token: localStorage.getItem("transformai_token"),
-  user: null,
-  view: "overview",
-  docs: [],
-  outputs: [],
-  analytics: null,
-  activeDoc: null,
-  chat: []
-};
+const state = { token: localStorage.getItem("morph_token"), user: null, view: "overview", docs: [], outputs: [], analytics: null, activeDoc: null, chat: [] };
+const OUTPUTS = ["Citizen Simplifier","Officer Brief","Executive Summary","FAQ Generator","WhatsApp Generator","Social Media Generator","Presentation Generator","Voice Script","Press Release","SMS / Alert","Infographic Content","Detailed Report","Key Facts / Statistics","Action Checklist"];
+const LANGUAGES = ["English","Hindi","Hinglish","Tamil","Telugu","Bengali","Marathi","Gujarati","Kannada","Malayalam","Punjabi","Odia"];
+const NAV = [["overview","Overview"],["new","New Transformation"],["documents","Documents"],["history","Transformation History"],["templates","Templates"],["analytics","Analytics"],["settings","Settings"]];
+const $ = (s, root = document) => root.querySelector(s); const app = $("#app");
+boot();
 
-const outputTypes = ["Citizen Simplifier", "Officer Brief", "Executive Summary", "FAQ Generator", "WhatsApp Generator", "Social Media Generator", "Presentation Generator", "Voice Script", "Press Release", "SMS / Alert", "Infographic Content"];
-const nav = ["Overview", "New Transformation", "Documents", "Transformation History", "Templates", "Saved Outputs", "Analytics", "Settings"];
-
-const $ = (sel) => document.querySelector(sel);
-const app = $("#app");
-
-init();
-
-async function init() {
-  if (!state.token) return renderLanding();
-  try {
-    const me = await api("/api/me");
-    state.user = me.user;
-    await loadData();
-    renderApp();
-  } catch {
-    localStorage.removeItem("transformai_token");
-    state.token = null;
-    renderLanding();
-  }
-}
-
-async function loadData() {
-  const [docs, outputs, analytics] = await Promise.all([api("/api/documents"), api("/api/transformations"), api("/api/analytics")]);
-  state.docs = docs.documents;
-  state.outputs = outputs.outputs;
-  state.analytics = analytics;
-  state.activeDoc ||= state.docs[0];
-}
-
-function renderLanding() {
-  app.innerHTML = `
-    <div class="landing">
-      <header class="topbar">
-        <div class="brand"><span class="seal">T</span> TransformAI</div>
-        <div><button class="ghost" data-login>Login</button> <button class="primary" data-demo>Explore Demo</button></div>
-      </header>
-      <main class="hero">
-        <section>
-          <h1>Transform One Source Into Every Message.</h1>
-          <p>AI-powered content transformation that preserves facts, context, citations, and intent for government and enterprise communication workflows.</p>
-          <div class="hero-actions">
-            <button class="primary" data-demo>Start Transforming</button>
-            <button class="ghost" data-login>Officer Login</button>
-          </div>
-        </section>
-        <section class="workflow-board">
-          <div class="workflow">
-            ${["Upload", "Understand", "Transform", "Verify", "Publish"].map((x, i) => `<div class="step"><b>0${i + 1}</b><strong>${x}</strong><span>${workflowText(x)}</span></div>`).join("")}
-          </div>
-          <div class="feature-grid">
-            ${["Multilingual AI", "Factuality Verification", "Citation Preservation", "Multi-Format Generation", "Document Intelligence", "Source-Grounded AI"].map((x) => `<div class="feature">${x}</div>`).join("")}
-          </div>
-        </section>
-      </main>
-    </div>`;
-  document.querySelectorAll("[data-demo]").forEach((b) => b.onclick = demoLogin);
-  document.querySelectorAll("[data-login]").forEach((b) => b.onclick = renderAuth);
-}
-
-function renderAuth() {
-  app.innerHTML = `
-    <main class="auth">
-      <section class="panel auth-card">
-        <div class="brand"><span class="seal">T</span> TransformAI</div>
-        <h2>Secure officer login</h2>
-        <p class="metric">Demo credentials: officer@transformai.gov / Officer@123</p>
-        <form id="loginForm">
-          <label>Email<input name="email" value="officer@transformai.gov" autocomplete="username"></label><br>
-          <label>Password<input name="password" type="password" value="Officer@123" autocomplete="current-password"></label><br>
-          <button class="primary full" type="submit">Login</button>
-          <button class="ghost full" type="button" data-back>Back</button>
-        </form>
-      </section>
-    </main>`;
-  $("#loginForm").onsubmit = async (e) => {
-    e.preventDefault();
-    const body = Object.fromEntries(new FormData(e.target));
-    const result = await api("/api/auth/login", { method: "POST", body });
-    state.token = result.token;
-    localStorage.setItem("transformai_token", result.token);
-    toast("Login successful");
-    await init();
-  };
-  $("[data-back]").onclick = renderLanding;
-}
-
-async function demoLogin() {
-  const result = await api("/api/auth/login", { method: "POST", body: { email: "officer@transformai.gov", password: "Officer@123" } });
-  state.token = result.token;
-  localStorage.setItem("transformai_token", result.token);
-  await init();
-}
-
-function renderApp() {
-  app.innerHTML = `
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="brand"><span class="seal">T</span> TransformAI</div>
-        <nav class="nav">${nav.map((n) => `<button class="${viewKey(n) === state.view ? "active" : ""}" data-view="${viewKey(n)}">${n}</button>`).join("")}</nav>
-        <div class="user-box">
-          <strong>${state.user.name}</strong><br>${state.user.role}<br>${state.user.email}
-          <br><br><button class="ghost" data-logout>Logout</button>
-        </div>
-      </aside>
-      <main class="main">
-        ${renderView()}
-      </main>
-    </div>`;
-  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; renderApp(); });
-  $("[data-logout]").onclick = () => { localStorage.removeItem("transformai_token"); location.reload(); };
-  bindView();
-}
-
-function renderView() {
-  if (state.view === "new-transformation") return renderWorkspace();
-  if (state.view === "documents") return renderDocuments();
-  if (state.view === "transformation-history" || state.view === "saved-outputs") return renderOutputs();
-  if (state.view === "analytics") return renderAnalytics();
-  if (state.view === "templates") return renderTemplates();
-  if (state.view === "settings") return renderSettings();
-  return renderOverview();
-}
-
-function renderOverview() {
-  const a = state.analytics;
-  return `
-    <div class="header"><div><h2>Operational Dashboard</h2><p>Source-grounded content transformation overview.</p></div><button class="primary" data-go-transform>New Transformation</button></div>
-    <section class="cards">
-      ${metric("Documents processed", a.documentsProcessed)}
-      ${metric("Transformations generated", a.transformationsGenerated)}
-      ${metric("Languages used", a.languagesUsed)}
-      ${metric("Outputs generated", a.outputsGenerated)}
-      ${metric("Avg factuality", `${a.averageFactualityScore}%`)}
-    </section>
-    <br>
-    <section class="panel">
-      <h3>Recent documents</h3>
-      ${docTable(state.docs.slice(0, 5))}
-    </section>`;
-}
-
-function renderWorkspace() {
-  const d = state.activeDoc;
-  return `
-    <div class="header"><div><h2>Transformation Workspace</h2><p>Upload once, generate many source-grounded deliverables.</p></div><button class="secondary" data-demo-fill>Load Sample Scenario</button></div>
-    <section class="workspace">
-      <div class="panel">
-        <h3>Source Document</h3>
-        <div class="drop" id="drop">Drop PDF, DOCX, TXT, MD or paste text below</div><br>
-        <input type="file" id="fileInput" accept=".txt,.md,.pdf,.docx">
-        <br><br><textarea id="sourceText" placeholder="Paste source content here...">${d?.text || ""}</textarea>
-        <div class="actions"><button class="primary" data-upload>Analyze Document</button></div>
-        ${d ? `<br><h3>Document Preview</h3><div class="doc-preview">${escapeHtml(d.text)}</div>` : ""}
-      </div>
-      <div class="panel">
-        <h3>Transform</h3>
-        <div class="form-grid">
-          ${select("audience", ["Citizen", "Officer", "Executive", "Student", "Media", "General Public"])}
-          ${select("tone", ["Formal", "Simple", "Professional", "Friendly", "Urgent", "Educational"])}
-          ${select("length", ["Short", "Medium", "Detailed"])}
-          ${select("channel", ["WhatsApp", "Email", "Website", "Social Media", "SMS", "Presentation", "Report", "Voice"])}
-          ${select("language", ["English", "Hindi", "Hinglish", "Tamil", "Telugu", "Bengali", "Marathi", "Gujarati", "Kannada", "Malayalam", "Punjabi", "Odia"], "English", "full")}
-        </div>
-        <h3>Output formats</h3>
-        <div class="check-list">${outputTypes.map((x, i) => `<label><input type="checkbox" name="outputType" value="${x}" ${i < 5 ? "checked" : ""}> ${x}</label>`).join("")}</div>
-        <div class="actions"><button class="primary" data-generate ${d ? "" : "disabled"}>Generate Selected Outputs</button></div>
-        ${d ? renderIntelligence(d) : ""}
-      </div>
-      <div class="panel">
-        <div class="tabs"><button class="active">Generated Output</button><button data-chat-tab>Chat</button><button data-compare-tab>Compare</button></div>
-        <div id="rightPane">${renderGenerated()}</div>
-      </div>
-    </section>`;
-}
-
-function renderGenerated() {
-  const visible = state.outputs.filter((o) => !state.activeDoc || o.documentIds.includes(state.activeDoc.id)).slice(0, 4);
-  if (!visible.length) return `<p class="metric">Generated outputs will appear here with factuality, citation coverage, and export controls.</p>`;
-  return visible.map(outputCard).join("");
-}
-
-function outputCard(o) {
-  const unsupported = o.verification?.unsupported || 0;
-  return `
-    <article class="output-card">
-      <strong>${o.outputType}</strong>
-      <div class="output-meta">
-        <span class="badge">${o.language}</span><span class="badge">${o.audience}</span>
-        <span class="badge ${o.factualityScore >= 90 ? "ok" : "warn"}">Factuality ${o.factualityScore}%</span>
-        <span class="badge ok">Citations ${o.citationCoverage}%</span>
-        ${o.demo ? `<span class="badge warn">Demo provider</span>` : ""}
-        ${unsupported ? `<span class="badge danger">${unsupported} unsupported</span>` : ""}
-      </div>
-      <div class="content" contenteditable="true" data-edit="${o.id}">${escapeHtml(o.content)}</div>
-      <details><summary>Why did AI generate this?</summary>${(o.citationMap || []).slice(0, 5).map((c) => `<p class="metric">${c.marker} Page ${c.page}, ${c.section}: ${escapeHtml(c.source)}</p>`).join("")}</details>
-      <div class="actions"><button data-copy="${o.id}">Copy</button><button data-save-version="${o.id}">Save Version</button><button data-export="${o.id}" data-format="md">Export MD</button><button data-export="${o.id}" data-format="json">Export JSON</button><button data-verify="${o.id}">Verify</button></div>
-    </article>`;
-}
-
-function renderIntelligence(d) {
-  const i = d.intelligence || {};
-  return `<br><h3>Source Intelligence</h3>
-    <div class="chips">${(i.topics || []).map((x) => `<span class="chip">${x}</span>`).join("")}</div><br>
-    <table class="table">
-      <tr><td>Words</td><td>${i.wordCount}</td></tr><tr><td>Pages</td><td>${i.pages}</td></tr>
-      <tr><td>Language</td><td>${i.detectedLanguage}</td></tr><tr><td>Claims</td><td>${i.claimCount}</td></tr>
-      <tr><td>Entities</td><td>${i.entityCount}</td></tr><tr><td>Citations</td><td>${i.citationCount}</td></tr>
-    </table>
-    <h3>Dates and numbers</h3><div class="chips">${[...(i.dates || []), ...(i.numbers || [])].map((x) => `<span class="chip">${x}</span>`).join("")}</div>`;
-}
-
-function renderDocuments() {
-  return `<div class="header"><div><h2>Documents</h2><p>Analyzed source library with document-level intelligence.</p></div></div><section class="panel">${docTable(state.docs)}</section>`;
-}
-
-function renderOutputs() {
-  return `<div class="header"><div><h2>Transformation History</h2><p>Versioned, verified outputs generated from source documents.</p></div></div><section class="panel">${state.outputs.map(outputCard).join("")}</section>`;
-}
-
-function renderAnalytics() {
-  const a = state.analytics;
-  return `<div class="header"><div><h2>Analytics</h2><p>Usage, factuality, languages, and department insights.</p></div></div>
-    <section class="cards">${metric("Avg factuality", `${a.averageFactualityScore}%`)}${metric("Avg citation coverage", `${a.averageCitationCoverage}%`)}${metric("Outputs", a.outputsGenerated)}${metric("Documents", a.documentsProcessed)}${metric("Languages", a.languagesUsed)}</section><br>
-    <div class="workspace" style="grid-template-columns:1fr 1fr 1fr">
-      <section class="panel"><h3>Transformation types</h3>${chart(a.byType)}</section>
-      <section class="panel"><h3>Languages</h3>${chart(a.byLanguage)}</section>
-      <section class="panel"><h3>Departments</h3>${chart(a.byDepartment)}</section>
-    </div>`;
-}
-
-function renderTemplates() {
-  return `<div class="header"><div><h2>Templates</h2><p>Reusable AI content modes for public communication.</p></div></div><section class="cards">${outputTypes.map((x) => `<div class="card"><strong>${x}</strong><p class="metric">${workflowText(x)}</p></div>`).join("")}</section>`;
-}
-
-function renderSettings() {
-  return `<div class="header"><div><h2>Settings</h2><p>Provider abstraction and security posture.</p></div></div><section class="panel"><table class="table">
-    <tr><th>Capability</th><th>Status</th></tr>
-    <tr><td>AI provider</td><td>Demo fallback active unless LLM_PROVIDER and API keys are configured</td></tr>
-    <tr><td>Authentication</td><td>JWT-style signed token, hashed passwords, protected APIs</td></tr>
-    <tr><td>Storage</td><td>Local JSON prototype with PostgreSQL-ready data model names</td></tr>
-    <tr><td>Security</td><td>Rate limiting, file size limits, no frontend API keys, audit logs</td></tr>
-  </table></section>`;
-}
-
-function bindView() {
-  const go = $("[data-go-transform]");
-  if (go) go.onclick = () => { state.view = "new-transformation"; renderApp(); };
-  const demo = $("[data-demo-fill]");
-  if (demo) demo.onclick = () => { state.activeDoc = state.docs[0]; renderApp(); };
-  const upload = $("[data-upload]");
-  if (upload) upload.onclick = uploadDoc;
-  const gen = $("[data-generate]");
-  if (gen) gen.onclick = generate;
-  const chatTab = $("[data-chat-tab]");
-  if (chatTab) chatTab.onclick = renderChatPane;
-  const compareTab = $("[data-compare-tab]");
-  if (compareTab) compareTab.onclick = renderComparePane;
-  document.querySelectorAll("[data-export]").forEach((b) => b.onclick = () => exportOutput(b.dataset.export, b.dataset.format));
-  document.querySelectorAll("[data-copy]").forEach((b) => b.onclick = () => copyOutput(b.dataset.copy));
-  document.querySelectorAll("[data-verify]").forEach((b) => b.onclick = () => verify(b.dataset.verify));
-  document.querySelectorAll("[data-save-version]").forEach((b) => b.onclick = () => saveVersion(b.dataset.saveVersion));
-}
-
-async function uploadDoc() {
-  const file = $("#fileInput").files[0];
-  let content = $("#sourceText").value;
-  let name = "Pasted content.txt";
-  let type = "text/plain";
-  if (file) {
-    name = file.name; type = file.type || "application/octet-stream";
-    content = await file.text().catch(() => content);
-  }
-  if (!content && !file) return toast("Paste content or choose a document");
-  const result = await api("/api/documents/upload", { method: "POST", body: { name, type, content, department: "Demo Department" } });
-  state.activeDoc = result.document;
-  await loadData();
-  toast("Document successfully analyzed");
-  renderApp();
-}
-
-async function generate() {
-  const body = {
-    documentIds: [state.activeDoc.id],
-    outputTypes: [...document.querySelectorAll("[name=outputType]:checked")].map((x) => x.value),
-    audience: $("#audience").value, tone: $("#tone").value, length: $("#length").value, channel: $("#channel").value, language: $("#language").value
-  };
-  if (!body.outputTypes.length) return toast("Select at least one output format");
-  const btn = $("[data-generate]");
-  btn.disabled = true; btn.textContent = "Generating...";
-  const result = await api("/api/transformations", { method: "POST", body });
-  state.outputs = [...result.outputs, ...state.outputs];
-  await loadData();
-  toast(`${result.outputs.length} outputs generated and verified`);
-  renderApp();
-}
-
-async function renderChatPane() {
-  $("#rightPane").innerHTML = `<h3>Chat with Document</h3><div class="chat-log" id="chatLog">${state.chat.map((m) => `<div class="msg ${m.role}">${escapeHtml(m.text)}</div>`).join("")}</div><br><input id="chatQuestion" placeholder="Ask: What is the eligibility criteria?"><div class="actions"><button class="primary" data-ask>Ask</button></div>`;
-  $("[data-ask]").onclick = async () => {
-    const q = $("#chatQuestion").value;
-    state.chat.push({ role: "user", text: q });
-    const result = await api(`/api/documents/${state.activeDoc.id}/chat`, { method: "POST", body: { question: q } });
-    state.chat.push({ role: "ai", text: `${result.answer}\n${(result.citations || []).map((c) => `${c.marker} Page ${c.page}, ${c.section}`).join("\n")}` });
-    renderChatPane();
-  };
-}
-
-async function renderComparePane() {
-  const options = state.docs.map((d) => `<option value="${d.id}">${d.title}</option>`).join("");
-  $("#rightPane").innerHTML = `<h3>Compare Documents</h3>${select("docA", [], "", "", options)}${select("docB", [], "", "", options)}<div class="actions"><button class="primary" data-compare>Compare</button></div><div id="compareResult"></div>`;
-  $("[data-compare]").onclick = async () => {
-    const result = await api("/api/documents/compare", { method: "POST", body: { documentIds: [$("#docA").value, $("#docB").value] } });
-    $("#compareResult").innerHTML = `<h3>Added clauses</h3><div class="content">${escapeHtml(result.addedClauses.join("\n"))}</div><h3>Removed clauses</h3><div class="content">${escapeHtml(result.removedClauses.join("\n"))}</div><h3>Changed dates</h3><pre>${escapeHtml(JSON.stringify(result.changedDates, null, 2))}</pre>`;
-  };
-}
-
-async function exportOutput(id, format) {
-  const result = await api(`/api/exports/${id}`, { method: "POST", body: { format } });
-  toast(`Exported to ${result.file}`);
-}
-
-async function copyOutput(id) {
-  const out = state.outputs.find((o) => o.id === id);
-  await navigator.clipboard.writeText(out.content);
-  toast("Copied output");
-}
-
-async function verify(id) {
-  const result = await api(`/api/transformations/${id}/verify`, { method: "POST", body: {} });
-  toast(`Factuality ${result.factualityScore}%, unsupported ${result.unsupported}`);
-}
-
-async function saveVersion(id) {
-  const el = document.querySelector(`[data-edit="${id}"]`);
-  await api(`/api/transformations/${id}/version`, { method: "POST", body: { content: el.innerText } });
-  toast("Version saved");
-}
-
-async function api(path, options = {}) {
-  const res = await fetch(path, {
-    method: options.method || "GET",
-    headers: { "Content-Type": "application/json", ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}) },
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Request failed");
-  return data;
-}
-
-function metric(label, value) { return `<div class="card"><div class="metric">${label}</div><div class="value">${value}</div></div>`; }
-function docTable(docs) { return `<table class="table"><tr><th>Document</th><th>Department</th><th>Claims</th><th>Status</th></tr>${docs.map((d) => `<tr><td><button class="ghost" onclick="window.pickDoc('${d.id}')">${d.title}</button></td><td>${d.department}</td><td>${d.intelligence?.claimCount || 0}</td><td><span class="badge ok">${d.status}</span></td></tr>`).join("")}</table>`; }
-window.pickDoc = (id) => { state.activeDoc = state.docs.find((d) => d.id === id); state.view = "new-transformation"; renderApp(); };
-function chart(obj) { const max = Math.max(1, ...Object.values(obj || {})); return `<div class="chart">${Object.entries(obj || {}).map(([k, v]) => `<div class="bar"><span>${k}</span><span style="width:${(v / max) * 100}%"></span><b>${v}</b></div>`).join("")}</div>`; }
-function select(id, values, selected = values[0], klass = "", override = "") { return `<label class="${klass}">${title(id)}<select id="${id}">${override || values.map((x) => `<option ${x === selected ? "selected" : ""}>${x}</option>`).join("")}</select></label>`; }
-function title(s) { return s.replace(/([A-Z])/g, " $1").replace(/^./, (x) => x.toUpperCase()); }
-function viewKey(s) { return s.toLowerCase().replace(/\s+/g, "-"); }
-function escapeHtml(s = "") { return String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
-function toast(text) { const t = document.createElement("div"); t.className = "toast"; t.textContent = text; $("#toast").append(t); setTimeout(() => t.remove(), 4200); }
-function workflowText(x) {
-  return {
-    Upload: "Ingest PDF, DOCX, TXT, Markdown, or pasted text.",
-    Understand: "Extract claims, entities, dates, numbers, and topics.",
-    Transform: "Generate for many audiences, tones, languages, and channels.",
-    Verify: "Check generated claims against source evidence.",
-    Publish: "Copy, version, export, and share approved output."
-  }[x] || "Reusable source-grounded transformation mode.";
-}
+async function boot() { if (!state.token) return landing(); try { state.user = (await api("/api/me")).user; await refresh(); render(); } catch { logout(false); } }
+async function refresh() { const [d,o,a] = await Promise.all([api("/api/documents"),api("/api/transformations"),api("/api/analytics")]); state.docs=d.documents; state.outputs=o.outputs; state.analytics=a; if (!state.activeDoc || !state.docs.some(x=>x.id===state.activeDoc.id)) state.activeDoc=state.docs[0]||null; }
+function landing() { app.innerHTML=`<div class="landing"><header class="topbar"><div class="brand"><span class="seal">M</span> MORPH</div><button class="primary" id="login">Officer Login</button></header><main class="hero"><section><div class="eyebrow">SOURCE-GROUNDED COMMUNICATION PLATFORM</div><h1>Transform one source into every message.</h1><p>Turn government documents into verified, audience-specific communication while preserving facts, citations, deadlines and source context.</p><div class="hero-actions"><button class="primary" id="demo">Explore Demo</button><button class="ghost" id="register">Create Account</button></div></section><section class="workflow-board"><div class="workflow">${["Upload","Understand","Transform","Verify","Publish"].map((x,i)=>`<div class="step"><b>0${i+1}</b><strong>${x}</strong><span>${workflowText(x)}</span></div>`).join("")}</div><div class="feature-grid">${["Multilingual AI","Factuality Verification","Citation Preservation","Multi-Format Generation","Document Intelligence","Source-Grounded AI"].map(x=>`<div class="feature">${x}</div>`).join("")}</div></section></main></div>`; $("#login").onclick=auth; $("#register").onclick=register; $("#demo").onclick=demo; }
+function auth() { formPage(false); }
+function register() { formPage(true); }
+function formPage(isRegister) { app.innerHTML=`<main class="auth"><section class="panel auth-card"><div class="brand"><span class="seal">M</span> MORPH</div><h2>${isRegister?"Create your account":"Secure officer login"}</h2><p class="metric">${isRegister?"Use at least 8 characters for your password.":"Sign in to your transformation workspace."}</p><form id="authForm">${isRegister?'<label>Name<input name="name" required maxlength="100"></label><br>':''}<label>Email<input name="email" type="email" required autocomplete="username"></label><br><label>Password<input name="password" type="password" required minlength="8" autocomplete="current-password"></label><br><button class="primary full" type="submit">${isRegister?"Create Account":"Login"}</button><button class="ghost full" type="button" id="back">Back</button></form></section></main>`; $("#back").onclick=landing; $("#authForm").onsubmit=async e=>{e.preventDefault(); try { const body=Object.fromEntries(new FormData(e.target)); const r=await api(isRegister?"/api/auth/register":"/api/auth/login",{method:"POST",body}); state.token=r.token; localStorage.setItem("morph_token",r.token); await boot(); } catch(err){ toast(err.message); }}; }
+async function demo(){ try { const r=await api("/api/auth/login",{method:"POST",body:{email:"officer@transformai.gov",password:"Officer@123"}}); state.token=r.token; localStorage.setItem("morph_token",r.token); await boot(); } catch(e){ toast("Demo account is disabled. Create an account instead."); } }
+function render(){ app.innerHTML=`<div class="app-shell"><aside class="sidebar"><div class="brand"><span class="seal">M</span> MORPH</div><nav class="nav">${NAV.map(([k,n])=>`<button data-view="${k}" class="${state.view===k?"active":""}">${n}</button>`).join("")}</nav><div class="user-box"><strong>${esc(state.user?.name||"")}</strong><br>${esc(state.user?.role||"")}<br>${esc(state.user?.email||"")}<br><br><button class="ghost" id="logout">Logout</button></div></aside><main class="main">${view()}</main></div>`; document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{state.view=b.dataset.view;render()}); $("#logout").onclick=()=>logout(true); bind(); }
+function view(){ if(state.view==="new")return workspace(); if(state.view==="documents")return documents(); if(state.view==="history")return outputsPage(); if(state.view==="templates")return templates(); if(state.view==="analytics")return analytics(); if(state.view==="settings")return settings(); return overview(); }
+function overview(){const a=state.analytics||{};return `<div class="header"><div><h2>Operational Dashboard</h2><p>Source-grounded transformation overview.</p></div><button class="primary" id="newBtn">New Transformation</button></div><section class="cards">${metric("Documents processed",a.documentsProcessed)}${metric("Transformations",a.transformationsGenerated)}${metric("Outputs generated",a.outputsGenerated)}${metric("Languages",a.languagesUsed)}${metric("Avg factuality",(a.averageFactualityScore||0)+"%")}</section><br><section class="panel"><h3>Recent documents</h3>${docTable(state.docs.slice(0,8))}</section>`}
+function workspace(){const d=state.activeDoc;return `<div class="header"><div><h2>Transformation Workspace</h2><p>Upload a source, inspect intelligence, then generate verified outputs.</p></div><button class="secondary" id="sample">Load Sample Scenario</button></div><section class="workspace"><section class="panel"><h3>Source Document</h3><div class="drop" id="drop">Drop a PDF, DOCX, TXT or Markdown file here</div><input type="file" id="fileInput" accept=".pdf,.docx,.txt,.md,.markdown"><br><br><textarea id="sourceText" placeholder="Or paste source text here...">${esc(d?.text||"")}</textarea><div class="actions"><button class="primary" id="upload">Analyze Document</button></div>${d?`<br><h3>Document Preview</h3><div class="doc-preview">${esc(d.text)}</div>`:""}</section><section class="panel"><h3>Transform</h3><div class="form-grid">${select("audience",["Citizen","Officer","Executive","Student","Media","General Public"])}${select("tone",["Formal","Simple","Professional","Friendly","Urgent","Educational"])}${select("length",["Short","Medium","Detailed"],"Medium")}${select("channel",["Website","WhatsApp","Email","Social Media","SMS","Presentation","Report","Voice"])}${select("language",LANGUAGES,"English","full")}</div><h3>Output formats</h3><div class="check-list">${OUTPUTS.map((x,i)=>`<label><input type="checkbox" name="outputType" value="${esc(x)}" ${i<5?"checked":""}> ${esc(x)}</label>`).join("")}</div><div class="actions"><button class="primary" id="generate" ${d?"":"disabled"}>Generate Selected Outputs</button></div>${d?intelligence(d):""}</section><section class="panel"><div class="tabs"><button class="active" id="outTab">Generated Output</button><button id="chatTab">Chat</button><button id="compareTab">Compare</button></div><div id="rightPane">${generated()}</div></section></section>`}
+function generated(){const os=state.outputs.filter(o=>!state.activeDoc||o.documentIds?.includes(state.activeDoc.id)).slice(0,5);return os.length?os.map(outputCard).join(""):`<p class="metric">Generated outputs will appear here.</p>`}
+function outputCard(o){return `<article class="output-card"><strong>${esc(o.outputType)}</strong><div class="output-meta"><span class="badge">${esc(o.language)}</span><span class="badge">${esc(o.audience)}</span><span class="badge ${o.factualityScore>=90?"ok":"warn"}">Factuality ${o.factualityScore}%</span><span class="badge ok">Citations ${o.citationCoverage}%</span>${o.demo?'<span class="badge warn">Demo</span>':''}</div><div class="content" contenteditable="true" data-edit="${o.id}">${esc(o.content)}</div><details><summary>Source evidence</summary>${(o.citationMap||[]).slice(0,6).map(c=>`<p class="metric">${esc(c.marker)} Page ${c.page}, ${esc(c.section)}: ${esc(c.source)}</p>`).join("")}</details><div class="actions"><button data-copy="${o.id}">Copy</button><button data-save="${o.id}">Save Version</button><button data-export="${o.id}" data-format="md">Export MD</button><button data-export="${o.id}" data-format="json">Export JSON</button><button data-verify="${o.id}">Verify</button></div></article>`}
+function intelligence(d){const i=d.intelligence||{};return `<br><h3>Source Intelligence</h3><div class="chips">${(i.topics||[]).map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div><table class="table"><tr><td>Words</td><td>${i.wordCount||0}</td></tr><tr><td>Pages</td><td>${i.pages||1}</td></tr><tr><td>Language</td><td>${esc(i.detectedLanguage||"")}</td></tr><tr><td>Claims</td><td>${i.claimCount||0}</td></tr><tr><td>Entities</td><td>${i.entityCount||0}</td></tr></table><h3>Dates & numbers</h3><div class="chips">${[...(i.dates||[]),...(i.numbers||[])].map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div>`}
+function documents(){return `<div class="header"><div><h2>Documents</h2><p>Analyzed source library.</p></div></div><section class="panel">${docTable(state.docs)}</section>`}
+function docTable(ds){return `<table class="table"><tr><th>Document</th><th>Department</th><th>Claims</th><th>Status</th></tr>${ds.map(d=>`<tr><td><button class="ghost" data-pick="${d.id}">${esc(d.title)}</button></td><td>${esc(d.department)}</td><td>${d.intelligence?.claimCount||0}</td><td><span class="badge ok">${esc(d.status||"Analyzed")}</span></td></tr>`).join("")}</table>`}
+function outputsPage(){return `<div class="header"><div><h2>Transformation History</h2><p>Versioned and verified outputs.</p></div></div><section class="panel">${state.outputs.length?state.outputs.map(outputCard).join(""):'<p class="metric">No outputs yet.</p>'}</section>`}
+function templates(){return `<div class="header"><div><h2>Templates</h2><p>Reusable source-grounded communication formats.</p></div></div><section class="cards">${OUTPUTS.map(x=>`<div class="card"><strong>${esc(x)}</strong><p class="metric">${workflowText(x)}</p></div>`).join("")}</section>`}
+function analytics(){const a=state.analytics||{};return `<div class="header"><div><h2>Analytics</h2><p>Usage, quality and department insights.</p></div></div><section class="cards">${metric("Avg factuality",(a.averageFactualityScore||0)+"%")}${metric("Avg citation coverage",(a.averageCitationCoverage||0)+"%")}${metric("Outputs",a.outputsGenerated)}${metric("Documents",a.documentsProcessed)}${metric("Languages",a.languagesUsed)}</section><br><div class="workspace" style="grid-template-columns:1fr 1fr 1fr"><section class="panel"><h3>Types</h3>${chart(a.byType)}</section><section class="panel"><h3>Languages</h3>${chart(a.byLanguage)}</section><section class="panel"><h3>Departments</h3>${chart(a.byDepartment)}</section></div>`}
+function settings(){return `<div class="header"><div><h2>Settings</h2><p>Deployment and security status.</p></div></div><section class="panel"><table class="table"><tr><th>Capability</th><th>Status</th></tr><tr><td>AI provider</td><td>Server-side OpenAI Responses API or intentional demo mode</td></tr><tr><td>Storage</td><td>PostgreSQL in production; local JSON for development</td></tr><tr><td>Authentication</td><td>Signed tokens and scrypt password hashing</td></tr><tr><td>Document parsing</td><td>PDF, DOCX, TXT and Markdown</td></tr><tr><td>Verification</td><td>Source claim support and citation coverage checks</td></tr></table></section>`}
+function bind(){ $("#newBtn")?.addEventListener("click",()=>{state.view="new";render()}); $("#sample")?.addEventListener("click",()=>{state.activeDoc=state.docs[0];render()}); document.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>{state.activeDoc=state.docs.find(d=>d.id===b.dataset.pick);state.view="new";render()}); $("#upload")?.addEventListener("click",upload); $("#generate")?.addEventListener("click",generate); document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>copy(b.dataset.copy)); document.querySelectorAll("[data-save]").forEach(b=>b.onclick=()=>saveVersion(b.dataset.save)); document.querySelectorAll("[data-verify]").forEach(b=>b.onclick=()=>verify(b.dataset.verify)); document.querySelectorAll("[data-export]").forEach(b=>b.onclick=()=>exportOut(b.dataset.export,b.dataset.format)); $("#chatTab")?.addEventListener("click",chatPane); $("#compareTab")?.addEventListener("click",comparePane); const drop=$("#drop"); if(drop){drop.ondragover=e=>{e.preventDefault();drop.classList.add("active")};drop.ondragleave=()=>drop.classList.remove("active");drop.ondrop=e=>{e.preventDefault();drop.classList.remove("active");const f=e.dataTransfer.files[0];if(f){const input=$("#fileInput");const dt=new DataTransfer();dt.items.add(f);input.files=dt.files;}};} }
+async function upload(){const file=$("#fileInput")?.files[0];let body={department:"General"};if(file){body.name=file.name;body.type=file.type||"application/octet-stream";body.encoding="base64";body.content=await fileToBase64(file);}else{body.name="Pasted source.txt";body.type="text/plain";body.content=$("#sourceText").value;body.encoding="text";}if(!body.content)return toast("Choose a file or paste source text.");try{const r=await api("/api/documents/upload",{method:"POST",body});state.activeDoc=r.document;await refresh();state.view="new";toast("Document analyzed");render()}catch(e){toast(e.message)}}
+async function generate(){if(!state.activeDoc)return toast("Analyze a document first.");const btn=$("#generate");const body={documentIds:[state.activeDoc.id],outputTypes:[...document.querySelectorAll("[name=outputType]:checked")].map(x=>x.value),audience:$("#audience").value,tone:$("#tone").value,length:$("#length").value,channel:$("#channel").value,language:$("#language").value};if(!body.outputTypes.length)return toast("Select at least one output.");btn.disabled=true;btn.textContent="Generating...";try{await api("/api/transformations",{method:"POST",body});await refresh();toast("Outputs generated and verified");render()}catch(e){toast(e.message);btn.disabled=false;btn.textContent="Generate Selected Outputs"}}
+function chatPane(){const d=state.activeDoc;if(!d)return;$("#rightPane").innerHTML=`<h3>Chat with Document</h3><div class="chat-log">${state.chat.map(m=>`<div class="msg ${m.role}">${esc(m.text)}</div>`).join("")}</div><br><input id="question" placeholder="Ask a question about this document"><div class="actions"><button class="primary" id="ask">Ask</button></div>`;$("#ask").onclick=async()=>{const q=$("#question").value.trim();if(!q)return;state.chat.push({role:"user",text:q});chatPane();try{const r=await api(`/api/documents/${d.id}/chat`,{method:"POST",body:{question:q}});state.chat.push({role:"ai",text:`${r.answer}\n${(r.citations||[]).map(c=>`${c.marker} Page ${c.page}, ${c.section}`).join("\n")}`);chatPane()}catch(e){toast(e.message)}}}
+function comparePane(){if(state.docs.length<2)return $("#rightPane").innerHTML='<p class="metric">Upload at least two documents to compare them.</p>';const opts=state.docs.map(d=>`<option value="${d.id}">${esc(d.title)}</option>`).join("");$("#rightPane").innerHTML=`<h3>Compare Documents</h3>${select("docA",[],"","",opts)}${select("docB",[],"","",opts)}<div class="actions"><button class="primary" id="compare">Compare</button></div><div id="compareResult"></div>`;$("#compare").onclick=async()=>{try{const r=await api("/api/documents/compare",{method:"POST",body:{documentIds:[$("#docA").value,$("#docB").value]}});$("#compareResult").innerHTML=`<h3>Added clauses</h3><div class="content">${esc(r.addedClauses.join("\n"))}</div><h3>Removed clauses</h3><div class="content">${esc(r.removedClauses.join("\n"))}</div><h3>Changed dates</h3><pre>${esc(JSON.stringify(r.changedDates,null,2))}</pre>`}catch(e){toast(e.message)}}}
+async function verify(id){try{const r=await api(`/api/transformations/${id}/verify`,{method:"POST",body:{}});toast(`Factuality ${r.factualityScore}% · unsupported ${r.unsupported}`)}catch(e){toast(e.message)}}
+async function saveVersion(id){const el=document.querySelector(`[data-edit="${id}"]`);try{await api(`/api/transformations/${id}/version`,{method:"POST",body:{content:el.innerText}});await refresh();toast("Version saved")}catch(e){toast(e.message)}}
+async function copy(id){const o=state.outputs.find(x=>x.id===id);if(!o)return;await navigator.clipboard.writeText(o.content);toast("Copied output")}
+async function exportOut(id,format){try{const r=await api(`/api/exports/${id}`,{method:"POST",body:{format}});const blob=new Blob([r.content],{type:format==="json"?"application/json":"text/markdown"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=r.filename;a.click();URL.revokeObjectURL(a.href)}catch(e){toast(e.message)}}
+async function api(path,opt={}){const r=await fetch(path,{method:opt.method||"GET",headers:{"Content-Type":"application/json",...(state.token?{Authorization:`Bearer ${state.token}`}:{})},body:opt.body?JSON.stringify(opt.body):undefined});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||`Request failed (${r.status})`);return data}
+function fileToBase64(file){return new Promise((resolve,reject)=>{const fr=new FileReader();fr.onload=()=>resolve(String(fr.result).split(",")[1]||"");fr.onerror=reject;fr.readAsDataURL(file)})}
+function logout(reload){localStorage.removeItem("morph_token");state.token=null;state.user=null;if(reload)landing();else landing()}
+function metric(l,v){return `<div class="card"><div class="metric">${esc(l)}</div><div class="value">${v??0}</div></div>`}
+function chart(obj={}){const max=Math.max(1,...Object.values(obj));return `<div class="chart">${Object.entries(obj).map(([k,v])=>`<div class="bar"><span>${esc(k)}</span><span style="width:${v/max*100}%"></span><b>${v}</b></div>`).join("")}</div>`}
+function select(id,values,selected=values[0],klass="",override=""){return `<label class="${klass}">${title(id)}<select id="${id}">${override||values.map(x=>`<option ${x===selected?"selected":""}>${esc(x)}</option>`).join("")}</select></label>`}
+function title(s){return s.replace(/([A-Z])/g," $1").replace(/^./,x=>x.toUpperCase())}
+function esc(s=""){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function toast(text){const t=document.createElement("div");t.className="toast";t.textContent=text;$("#toast").append(t);setTimeout(()=>t.remove(),4500)}
+function workflowText(x){return({Upload:"Ingest PDF, DOCX, TXT, Markdown or pasted text.",Understand:"Extract claims, entities, dates, numbers and topics.",Transform:"Generate for audiences, tones, languages and channels.",Verify:"Check generated claims against source evidence.",Publish:"Copy, version, export and share approved output."})[x]||"Reusable source-grounded transformation mode."}
