@@ -5,8 +5,8 @@
   "description": "MORPH - Multiformat Output & Representation Processing Hub for SIH26154",
   "type": "module",
   "scripts": {
-    "start": "node apps/api/server.js",
-    "dev": "node --watch apps/api/server.js",
+    "start": "node --env-file-if-exists=.env apps/api/server.js",
+    "dev": "node --watch --env-file-if-exists=.env apps/api/server.js",
     "test": "node tests/run-tests.js"
   },
   "engines": {
