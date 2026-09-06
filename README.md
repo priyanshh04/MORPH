@@ -137,10 +137,6 @@ The provider layer is isolated in `packages/ai/provider.js`. To connect OpenAI, 
 - Configure a real LLM and embedding provider.
 - Replace local vector retrieval with FAISS, Chroma, Qdrant, or pgvector.
 
-## Screenshots
-
-Add final screenshots to `docs/screenshots/` after recording the SIH demo video.
-
 ## Future Enhancements
 
 - Real streaming generation
