@@ -1,14 +1,20 @@
 {
-  "name": "transformai",
+  "name": "morph",
   "version": "1.0.0",
   "private": true,
-  "description": "SIH26154 GenAI Platform for Automated Content Transformation",
+  "description": "MORPH - source-grounded government communication transformation platform",
   "type": "module",
   "scripts": {
     "start": "node apps/api/server.js",
     "test": "node tests/run-tests.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
+  },
+  "dependencies": {
+    "mammoth": "^1.8.0",
+    "openai": "^7.10.0",
+    "pdf-parse": "^1.1.1",
+    "pg": "^8.13.1"
   }
 }
