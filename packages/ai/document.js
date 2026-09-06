@@ -9,7 +9,7 @@ export function normalizeText(text = "") {
 export function parseUploadedContent({ name = "Pasted source", type = "text/plain", content = "" }) {
   const clean = normalizeText(content);
   const ext = name.split(".").pop()?.toLowerCase();
-  const supported = ["pdf", "docx", "txt", "md", "markdown"].includes(ext) || type.includes("text");
+  const supported = ["pdf", "docx", "txt", "md", "markdown", "csv", "png", "jpg", "jpeg", "webp", "wav", "mp3", "zip"].includes(ext) || type.includes("text");
   const fallback = clean || demoBodyFor(name);
   return {
     title: inferTitle(fallback, name),
@@ -17,8 +17,13 @@ export function parseUploadedContent({ name = "Pasted source", type = "text/plai
     fileType: ext || "txt",
     supported,
     pages: Math.max(1, Math.ceil(fallback.length / 2600)),
-    metadata: { originalName: name, mimeType: type, parser: clean ? "text-extractor" : "demo-safe-fallback" }
+    metadata: { originalName: name, mimeType: type, parser: parserFor(ext, clean) }
   };
+}
+
+function parserFor(ext, clean) {
+  if (clean) return ["pdf", "docx", "png", "jpg", "jpeg", "webp", "wav", "mp3", "zip"].includes(ext) ? "text-surrogate-parser" : "text-extractor";
+  return "demo-safe-fallback";
 }
 
 function inferTitle(text, name) {

@@ -1,60 +1,56 @@
-# TransformAI
+# MORPH
 
-**SIH26154 - GenAI Platform for Automated Content Transformation**
+**Multiformat Output & Representation Processing Hub**
 
-TransformAI is a government/enterprise-grade AI content transformation platform for converting one trusted source into many audience-specific, language-specific, and channel-specific communication artifacts while preserving context, facts, and citations.
+MORPH is a Smart India Hackathon 2026 implementation for **SIH26154 - GenAI Platform for Automated Content Transformation**. It securely ingests source information, extracts evidence, retrieves relevant context, transforms content into multiple representations, verifies generated claims, exposes traceability, supports human review, and exports artifacts with provenance.
 
-Tagline: **One Source. Every Audience. Every Format.**
+MORPH does not ask users to blindly trust AI. It presents source evidence, citations, factuality scoring, confidence signals, conflicts, security findings, authenticity assessment, and reviewer approval status.
 
-## Features
+## Core Pipeline
 
-- Landing page and protected dashboard
-- Login, register, logout, role-ready user model
-- Demo mode that works without external API keys
-- PDF/DOCX/TXT/Markdown/pasted-text ingestion interface
-- Document preview and source intelligence
-- Claim, entity, date, number, topic, and risk extraction
-- Modular AI provider abstraction with deterministic demo provider
-- Multi-output generation from one source
-- Citizen, officer, FAQ, WhatsApp, social, presentation, voice, press, SMS, infographic, report, facts, and checklist modes
-- Citation map and source evidence explanations
+```text
+AUTHENTICATE -> SECURE -> INGEST -> UNDERSTAND -> RETRIEVE -> TRANSFORM -> VERIFY -> TRACE -> HUMAN REVIEW -> PUBLISH
+```
+
+## Implemented Features
+
+- Dark enterprise landing page and protected dashboard
+- Secure login/register/logout with hashed passwords and bearer tokens
+- White accessible logout button
+- Swarm Ingestion Matrix for multiple files and pasted sources
+- Upload allow-list for PDF, DOCX, TXT, Markdown, CSV, images, audio, and ZIP names
+- Source intelligence: facts, entities, dates, numbers, topics, risks
+- RAG-style chunk retrieval with chunk/page/section metadata
+- MORPH Studio with explicit controls for audience, tone, length, channel, language, and format
+- Multi-output generation from the same source
+- Ask MORPH document Q&A with source citations and confidence
+- Glass Box evidence mapping from generated claims to source evidence
 - Factuality verification with supported, partial, and unsupported claim counts
-- Chat with document using retrieved source chunks
-- Multi-document transformation support through API
-- Document comparison for added/removed clauses and changed dates/numbers
-- Version history for edited outputs
-- Markdown and JSON export
-- Analytics dashboard with usage, departments, languages, factuality, and citation coverage
-- Security basics: password hashing, signed tokens, protected APIs, rate limiting, upload size limits, audit logs, no frontend API keys
+- Confidence and conflict detection for changed dates/numbers
+- MORPH Immune System for prompt-injection-like content and hidden Unicode
+- Clearance-based deterministic redaction
+- Historical Echoes for potential source relationships
+- Bias Neutralizer
+- Authenticity Assessment
+- Oracle Mode as evidence-based scenario analysis, not prediction
+- Human review and approval
+- Markdown/JSON/HTML export path with artifact provenance hash
+- Audit and provenance verification endpoints
+- Analytics driven from stored actions and generated outputs
+- Explicit demo mode for SIH judging without external API keys
+- Server-side OpenAI Responses API provider path
 
 ## Tech Stack
 
-- Frontend: HTML, CSS, vanilla JavaScript SPA
+- Frontend: dependency-free SPA using HTML, CSS, JavaScript
 - Backend: Node.js HTTP server
-- AI: provider abstraction in `packages/ai`
-- Database: local JSON store using PostgreSQL-style table names for prototype portability
-- Auth: hashed passwords and signed bearer tokens
-- Tests: Node built-in `assert`
+- AI layer: `packages/ai` provider abstraction
+- Persistence: local JSON database with relational collection names
+- Tests: Node `assert`
 
-This implementation avoids external dependencies so it runs reliably in restricted hackathon/demo environments. The structure is intentionally compatible with a later React/FastAPI/PostgreSQL migration.
+The prototype avoids mandatory installs so it can run in restricted demo environments. Production migration should replace JSON storage with PostgreSQL + pgvector.
 
-## Project Structure
-
-```text
-apps/
-  api/        HTTP API, auth, seed data
-  web/        Landing page and dashboard SPA
-packages/
-  ai/         Document intelligence, provider abstraction, verification
-  database/   Persistent JSON store
-  shared/     Config and shared constants
-docs/         Architecture and API notes
-tests/        Unit/API pipeline tests
-data/         Local database generated on first launch
-exports/      Generated export files
-```
-
-## Setup
+## Run Locally
 
 ```bash
 cd transformai
@@ -67,87 +63,88 @@ Open:
 http://localhost:4321
 ```
 
-Run tests:
+## Demo Credentials
+
+```text
+officer@transformai.gov / Officer@123
+admin@transformai.gov / Admin@123
+```
+
+## Tests
 
 ```bash
 node tests/run-tests.js
 ```
 
-## Demo Credentials
+Coverage includes parsing, chunking, RAG retrieval, transformation, citation preservation, verification, auth, upload validation, Immune System scan, redaction, and conflict detection.
 
-- Officer: `officer@transformai.gov` / `Officer@123`
-- Admin: `admin@transformai.gov` / `Admin@123`
+## Environment
 
-The **Explore Demo** button logs in using the officer account and loads realistic sample documents:
+See `.env.example`.
 
-1. Government welfare scheme notification
-2. District disaster/weather alert
-3. Education policy document
-
-## Environment Variables
-
-Copy `.env.example` and configure as needed:
+Important values:
 
 ```text
-PORT=4321
-DATABASE_URL=postgresql://transformai:transformai@localhost:5432/transformai
 OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 LLM_PROVIDER=demo
-MODEL_NAME=gpt-4.1-mini
-EMBEDDING_MODEL=text-embedding-3-small
-VECTOR_DB_URL=local-json
-JWT_SECRET=change-this-in-production
-STORAGE_PROVIDER=local
+DEMO_MODE=true
+DATABASE_URL=
+JWT_SECRET=
+STORAGE_PATH=data
 MAX_UPLOAD_MB=12
+APP_URL=http://localhost:4321
 ```
 
-## AI Provider Modes
+In production OpenAI mode, set:
 
-### Demo Mode
+```text
+LLM_PROVIDER=openai
+DEMO_MODE=false
+OPENAI_API_KEY=<server-side-key>
+```
 
-The default provider is deterministic and source-grounded. It demonstrates ingestion, intelligence extraction, transformation, citations, multilingual review labeling, factuality scoring, chat, analytics, and exports without an API key.
+If OpenAI production mode is selected without a key, the backend returns a configuration error instead of silently pretending demo content came from OpenAI.
 
-### Real AI Mode
-
-The provider layer is isolated in `packages/ai/provider.js`. To connect OpenAI, Ollama, Hugging Face, or another local/open model, implement a provider with the same `transform` and `chat` methods and switch using `LLM_PROVIDER`.
-
-## API Overview
+## API Highlights
 
 - `POST /api/auth/login`
-- `POST /api/auth/register`
 - `GET /api/me`
 - `POST /api/documents/upload`
-- `GET /api/documents`
+- `POST /api/documents/swarm`
+- `POST /api/documents/:id/analyze`
 - `POST /api/documents/:id/chat`
+- `GET /api/documents/:id/glass-box`
+- `GET /api/documents/:id/immune`
+- `POST /api/documents/:id/redact`
+- `GET /api/documents/:id/echoes`
+- `POST /api/documents/:id/neutralize`
+- `POST /api/documents/:id/oracle`
+- `GET /api/documents/:id/authenticity`
 - `POST /api/documents/compare`
 - `POST /api/transformations`
-- `GET /api/transformations`
 - `POST /api/transformations/:id/verify`
-- `POST /api/transformations/:id/version`
+- `POST /api/reviews/:id`
 - `POST /api/exports/:id`
+- `POST /api/provenance/verify`
+- `GET /api/audit`
 - `GET /api/analytics`
 
-## Deployment Notes
+## Deployment
 
-- Put the Node service behind HTTPS.
-- Set a strong `JWT_SECRET`.
-- Replace local JSON storage with PostgreSQL using the same table names.
-- Use object storage for sensitive uploads.
-- Add a production parser for binary PDF/DOCX extraction.
-- Configure a real LLM and embedding provider.
-- Replace local vector retrieval with FAISS, Chroma, Qdrant, or pgvector.
+For a production deployment:
 
-## Screenshots
+1. Run the Node server behind HTTPS.
+2. Set a strong `JWT_SECRET`.
+3. Set `DEMO_MODE=false` and configure `OPENAI_API_KEY`.
+4. Replace local JSON with PostgreSQL.
+5. Add pgvector, Qdrant, Chroma, or another vector store.
+6. Store uploaded files in secure object storage.
+7. Add file malware scanning and robust binary PDF/DOCX/OCR/transcription workers.
+8. Put long-running ingestion and generation into a job queue.
+9. Add department-level RBAC and clearance enforcement.
 
-Add final screenshots to `docs/screenshots/` after recording the SIH demo video.
+## Responsible AI Limits
 
-## Future Enhancements
-
-- Real streaming generation
-- Background job queue
-- OCR and speech transcription
-- Full DOCX/PDF export
-- Department-level RBAC
-- Human approval workflow
-- Redaction and DLP checks
-- Enterprise SSO
+MORPH does not claim 100% accuracy, zero hallucinations, guaranteed authenticity, perfect bias removal, unhackability, or future prediction. It is a source-grounded transformation and review platform that makes evidence and uncertainty visible.

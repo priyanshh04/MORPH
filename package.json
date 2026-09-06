@@ -1,8 +1,8 @@
 {
-  "name": "transformai",
+  "name": "morph",
   "version": "1.0.0",
   "private": true,
-  "description": "SIH26154 GenAI Platform for Automated Content Transformation",
+  "description": "MORPH - Multiformat Output & Representation Processing Hub for SIH26154",
   "type": "module",
   "scripts": {
     "start": "node apps/api/server.js",
