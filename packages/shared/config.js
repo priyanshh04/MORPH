@@ -5,7 +5,9 @@ export const CONFIG = {
   port: Number(process.env.PORT || 4321),
   isProduction,
   demoMode: explicitDemoMode,
-  llmProvider: String(process.env.LLM_PROVIDER || (process.env.OPENAI_API_KEY ? "openai" : "demo")).toLowerCase(),
+  // MORPH is source-grounded and fully usable without a paid external LLM.
+  // External LLM usage is opt-in only via LLM_PROVIDER=openai.
+  llmProvider: String(process.env.LLM_PROVIDER || "demo").toLowerCase(),
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   modelName: process.env.MODEL_NAME || "gpt-5.6-luna",
   aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS || 60000),
@@ -23,7 +25,6 @@ if (CONFIG.llmProvider === "openai" && !CONFIG.openaiApiKey) {
 if (CONFIG.isProduction) {
   if (!CONFIG.jwtSecret || CONFIG.jwtSecret.length < 32) throw new Error("JWT_SECRET must be set to a random value of at least 32 characters in production.");
   if (!CONFIG.databaseUrl) throw new Error("DATABASE_URL is required in production.");
-  if (CONFIG.llmProvider === "demo" && !CONFIG.demoMode) throw new Error("Production requires LLM_PROVIDER=openai unless DEMO_MODE=true.");
 }
 
 export const OUTPUT_TYPES = [
