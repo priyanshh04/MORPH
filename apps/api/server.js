@@ -24,14 +24,20 @@ const server = http.createServer(async (req, res) => {
     setSecurityHeaders(res);
     if (rateLimited(req)) return json(res, 429, { error: "Rate limit exceeded" });
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-    if (url.pathname.startsWith("/api/")) return handleApi(req, res, url);
-    return serveStatic(res, url.pathname);
+    if (url.pathname.startsWith("/api/")) return await handleApi(req, res, url);
+    return await serveStatic(res, url.pathname);
   } catch (error) {
     console.error(error);
+    if (res.headersSent) return;
     return json(res, error.message === "Payload too large" ? 413 : 500, {
       error: error.message === "Payload too large" ? error.message : "Internal server error"
     });
   }
+});
+
+server.on("clientError", (error, socket) => {
+  console.error("HTTP client error:", error.message);
+  if (!socket.destroyed) socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
 });
 
 server.listen(CONFIG.port, "0.0.0.0", () => console.log(`MORPH running on port ${CONFIG.port}`));
@@ -259,6 +265,7 @@ async function serveStatic(res, pathname) {
 }
 
 function json(res, status, payload) {
+  if (res.headersSent) return;
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   res.end(status === 204 ? "" : JSON.stringify(payload));
 }
