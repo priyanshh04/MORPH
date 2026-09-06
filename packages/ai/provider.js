@@ -1,9 +1,10 @@
 import OpenAI from "openai";
 import { CONFIG, OUTPUT_TYPES } from "../shared/config.js";
 
-const STOP = new Set("the and for with from this that have will are was were has into shall should would could about above below where which when what who whom your their there here been being through using under over such not its also than then them they our out use can may per via a an as is of to in on at by or be it if how why does did do these those whose".split(" "));
+const STOP = new Set("the and for with from this that have will are was were has into shall should would could about above below where which when what who whom your their there here been being through using under over such not its also than then them they our out use can may per via a an as is of to in on at by or be it if how why does did do these those whose scheme schemes document source information".split(" "));
 const GROUNDED_FALLBACK = "MORPH could not verify this information in the selected source.";
-const DATE_RE = /\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+20\d{2}\b/i;
+const DATE_RE = /\b(?:\d{1,2}\s+)?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+20\d{2}\b/i;
+const NUMERIC_DATE_RE = /\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b/;
 const YEAR_RE = /\b20\d{2}\b/;
 const AMOUNT_RE = /(?:INR|₹)\s?[\d,]+(?:\.\d+)?(?:\s?(?:crore|lakh))?/i;
 
@@ -41,9 +42,7 @@ export class DemoAIProvider {
       body = `${heading}\n\n${factsText}`;
     }
 
-    if (language !== "English") {
-      body = `${body}\n\n[LOCAL MODE: source language preserved. Human/LLM translation is required before publishing in ${language}.]`;
-    }
+    if (language !== "English") body = `${body}\n\n[LOCAL MODE: source language preserved. Human/LLM translation is required before publishing in ${language}.]`;
 
     return {
       title: heading,
@@ -55,18 +54,21 @@ export class DemoAIProvider {
   }
 
   async chat({ question = "", evidence = [] }) {
+    if (!evidence.length) return { answer: GROUNDED_FALLBACK, citations: [] };
+
     const candidates = evidence.flatMap((chunk, chunkIndex) => sentenceList(chunk.text).map((text, sentenceIndex) => ({ text, chunk, chunkIndex, sentenceIndex })));
     if (!candidates.length) return { answer: GROUNDED_FALLBACK, citations: [] };
 
     const intent = detectIntent(question);
-    const ranked = candidates
-      .map((item) => ({ ...item, score: sentenceScore(item.text, question, intent) }))
+    const ranked = candidates.map((item) => ({ ...item, score: sentenceScore(item.text, question, intent) }))
       .sort((a, b) => b.score - a.score || a.chunkIndex - b.chunkIndex || a.sentenceIndex - b.sentenceIndex);
 
     const answerCandidate = chooseAnswerCandidate(ranked, intent);
     if (!answerCandidate || answerCandidate.score < minimumScore(intent)) return { answer: GROUNDED_FALLBACK, citations: [] };
 
     const answer = buildGroundedAnswer(answerCandidate, intent);
+    if (answer === GROUNDED_FALLBACK) return { answer, citations: [] };
+
     const supporting = [answerCandidate, ...ranked.filter((x) => x !== answerCandidate && x.score > 0)].slice(0, 3);
     return {
       answer,
@@ -76,55 +78,56 @@ export class DemoAIProvider {
 }
 
 function detectIntent(question) {
-  const q = String(question).toLowerCase();
-  if (/\bwhen\b|\blaunched\b|\bstarted\b|\bbegan\b|\bdate\b/.test(q)) return "date";
-  if (/\bwho\b|\bdepartment\b|\bministry\b|\bauthority\b|\borganisation\b|\borganization\b/.test(q)) return "owner";
-  if (/\bhow much\b|\bamount\b|\bbudget\b|\bbenefit\b|\bcost\b|\bprice\b/.test(q)) return "amount";
-  if (/\bdeadline\b|\blast date\b|\bclose\b|\bclosing\b|\bapply\b|\bsubmit\b|\bdue\b/.test(q)) return "deadline";
-  if (/\beligib\b|\bqualification\b|\bqualify\b|\bbeneficiar/.test(q)) return "eligibility";
+  const q = normalizeQuestion(question);
+  if (/\bwhen\b|\blaunched\b|\blaunch\b|\bstarted\b|\bbegan\b|\bintroduced\b|\bannounced\b|\bissued\b|\bdate\b|\byear\b/.test(q)) return "date";
+  if (/\bwho\b|\bdepartment\b|\bministry\b|\bauthority\b|\borganisation\b|\borganization\b|\bissued by\b|\bissued from\b/.test(q)) return "owner";
+  if (/\bhow much\b|\bamount\b|\bbudget\b|\bbenefit\b|\bcost\b|\bprice\b|\bvalue\b/.test(q)) return "amount";
+  if (/\bdeadline\b|\blast date\b|\bclose\b|\bclosing\b|\bapply\b|\bsubmit\b|\bdue\b|\bby when\b/.test(q)) return "deadline";
+  if (/\beligib\b|\bqualification\b|\bqualify\b|\bbeneficiar\b|\bwho can apply\b/.test(q)) return "eligibility";
   return "general";
 }
 
 function chooseAnswerCandidate(ranked, intent) {
   const relevant = ranked.filter((x) => x.score > 0);
   if (intent === "date") {
-    return relevant.find((x) => DATE_RE.test(x.text) && /launched|started|began|issued|introduced|announced/i.test(x.text))
-      || relevant.find((x) => YEAR_RE.test(x.text) && /launched|started|began|issued|introduced|announced/i.test(x.text))
-      || relevant.find((x) => DATE_RE.test(x.text));
+    return relevant.find((x) => hasDate(x.text) && /launched|launch|started|began|introduced|announced|issued|effective|commenced/i.test(x.text))
+      || relevant.find((x) => hasDate(x.text))
+      || relevant.find((x) => YEAR_RE.test(x.text) && /scheme|policy|programme|program|notification|document/i.test(x.text));
   }
-  if (intent === "amount") return relevant.find((x) => AMOUNT_RE.test(x.text));
-  if (intent === "deadline") return relevant.find((x) => DATE_RE.test(x.text) && /deadline|close|apply|submit|due|by/i.test(x.text))
-    || relevant.find((x) => /deadline|close|apply|submit|due/i.test(x.text));
-  if (intent === "eligibility") return relevant.find((x) => /eligib|qualification|qualify|beneficiar/i.test(x.text));
+  if (intent === "amount") return relevant.find((x) => AMOUNT_RE.test(x.text) || /\b\d[\d,]*(?:\.\d+)?\s*(?:crore|lakh|million|thousand)\b/i.test(x.text));
+  if (intent === "deadline") return relevant.find((x) => hasDate(x.text) && /deadline|close|closing|apply|submit|due|last date|by\b/i.test(x.text))
+    || relevant.find((x) => /deadline|close|closing|apply|submit|due|last date/i.test(x.text));
+  if (intent === "eligibility") return relevant.find((x) => /eligib|qualification|qualify|beneficiar|who can apply/i.test(x.text));
   if (intent === "owner") return relevant.find((x) => /department|ministry|authority|organisation|organization/i.test(x.text));
   return relevant[0];
 }
 
-function minimumScore(intent) {
-  return intent === "general" ? 4 : 1;
-}
+function minimumScore(intent) { return intent === "general" ? 4 : 1; }
 
 function buildGroundedAnswer(candidate, intent) {
   const text = plain(candidate?.text || "");
   if (!text) return GROUNDED_FALLBACK;
 
   if (intent === "date") {
-    const date = text.match(DATE_RE)?.[0];
-    if (date && /launched|started|began|introduced|announced/i.test(text)) return `The source states that the scheme was launched on **${date}**. [1]`;
+    const date = text.match(DATE_RE)?.[0] || text.match(NUMERIC_DATE_RE)?.[0];
+    if (date && /launched|launch|started|began|introduced|announced|issued|effective|commenced/i.test(text)) return `The source states that it was launched on **${date}**. [1]`;
+    if (date) return `The source specifies the date as **${date}**. [1]`;
     const year = text.match(YEAR_RE)?.[0];
-    if (year && /launched|started|began|introduced|announced/i.test(text)) return `The source states that the scheme was launched in **${year}**. [1]`;
+    if (year) return `The source specifies **${year}**. [1]`;
     return GROUNDED_FALLBACK;
   }
 
   if (intent === "amount") {
-    const amount = text.match(AMOUNT_RE)?.[0];
+    const amount = text.match(AMOUNT_RE)?.[0] || text.match(/\b\d[\d,]*(?:\.\d+)?\s*(?:crore|lakh|million|thousand)\b/i)?.[0];
     return amount ? `The amount stated in the source is **${amount}**. [1]` : GROUNDED_FALLBACK;
   }
 
   if (intent === "deadline") {
-    const date = text.match(DATE_RE)?.[0];
-    return date ? `The stated deadline is **${date}**. [1]` : text.includes("deadline") || /close|apply|submit|due/i.test(text) ? `${text} [1]` : GROUNDED_FALLBACK;
+    const date = text.match(DATE_RE)?.[0] || text.match(NUMERIC_DATE_RE)?.[0];
+    return date ? `The stated deadline is **${date}**. [1]` : /deadline|close|closing|apply|submit|due|last date/i.test(text) ? `${text} [1]` : GROUNDED_FALLBACK;
   }
+
+  if (intent === "eligibility") return /eligib|qualification|qualify|beneficiar|who can apply/i.test(text) ? `${text} [1]` : GROUNDED_FALLBACK;
 
   if (intent === "owner") {
     const owner = text.match(/(?:the\s+)?([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,6})\s+(?:launched|issued|announced|introduced|published|released)/)?.[1];
@@ -134,6 +137,12 @@ function buildGroundedAnswer(candidate, intent) {
   return `${text} [1]`;
 }
 
+function normalizeQuestion(question) {
+  return String(question).toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function hasDate(text) { return DATE_RE.test(text) || NUMERIC_DATE_RE.test(text) || YEAR_RE.test(text); }
+
 function sentenceList(text) {
   const normalized = String(text).replace(/\s+/g, " ").trim();
   if (!normalized) return [];
@@ -141,20 +150,27 @@ function sentenceList(text) {
 }
 
 function sentenceScore(text, question, intent) {
-  const qTerms = new Set((String(question).toLowerCase().match(/[a-z0-9]+/g) || []).filter((x) => x.length > 2 && !STOP.has(x)));
+  const qTerms = new Set((normalizeQuestion(question).match(/[a-z0-9]+/g) || []).filter((x) => x.length > 2 && !STOP.has(x)));
   const hay = text.toLowerCase();
   const words = new Set((hay.match(/[a-z0-9]+/g) || []));
   let score = 0;
   for (const term of qTerms) if (words.has(term)) score += 4; else if (hay.includes(term)) score += 1;
-  if (intent === "date" && /launched|issued|started|began|introduced|announced/i.test(text)) score += 14;
-  if (intent === "date" && DATE_RE.test(text)) score += 30;
-  else if (intent === "date" && YEAR_RE.test(text)) score += 10;
+
+  if (intent === "date") {
+    if (/launched|launch|started|began|introduced|announced|issued|effective|commenced/i.test(text)) score += 20;
+    if (DATE_RE.test(text) || NUMERIC_DATE_RE.test(text)) score += 35;
+    else if (YEAR_RE.test(text)) score += 10;
+  }
   if (intent === "owner" && /department|ministry|authority|organisation|organization/i.test(text)) score += 12;
-  if (intent === "amount" && /INR|₹|crore|lakh|amount|benefit/i.test(text)) score += 12;
-  if (intent === "deadline" && /deadline|close|last date|apply|submit|due|by\b/i.test(text)) score += 12;
-  if (intent === "eligibility" && /eligib|qualification|qualify|beneficiar/i.test(text)) score += 12;
-  if (/^newly launched scheme\s*[.·•_-]*$/i.test(text.trim())) score -= 100;
-  if (/^[\d\s.,:;\-–—]+$/.test(text)) score -= 50;
+  if (intent === "amount" && /INR|₹|crore|lakh|amount|benefit|cost|price/i.test(text)) score += 12;
+  if (intent === "deadline" && /deadline|close|closing|last date|apply|submit|due|by\b/i.test(text)) score += 14;
+  if (intent === "eligibility" && /eligib|qualification|qualify|beneficiar|who can apply/i.test(text)) score += 14;
+
+  // Common PDF extraction artefacts should never become answers.
+  if (/^newly launched scheme\s*[.·•_-]*$/i.test(text.trim())) score -= 200;
+  if (/^(?:launched|newly launched|scheme)\s*[.·•_-]+$/i.test(text.trim())) score -= 200;
+  if (/^[\d\s.,:;\-–—]+$/.test(text)) score -= 100;
+  if (text.length < 20) score -= 5;
   return score;
 }
 
@@ -177,11 +193,11 @@ export class OpenAIProvider {
 
   async chat({ question, evidence = [] }) {
     if (!evidence.length) return { answer: GROUNDED_FALLBACK, citations: [] };
-    const source = evidence.slice(0, 8).map((e, i) => `[${i + 1}] page ${e.page}, ${e.section}: ${e.text}`).join("\n");
+    const source = evidence.slice(0, 12).map((e, i) => `[${i + 1}] page ${e.page}, ${e.section}: ${e.text}`).join("\n");
     const instructions = `You are MORPH's source-grounded document Q&A engine. Answer ONLY from the supplied evidence. Never use outside knowledge. For date questions, return the exact date and year when present. For amount, deadline, eligibility and owner questions, return only what the evidence supports. Keep answers concise. Cite factual claims with evidence markers. If unsupported, say: "${GROUNDED_FALLBACK}".`;
     const response = await this.client.responses.create({ model: this.model, instructions, input: `QUESTION: ${question}\n\nSOURCE EVIDENCE:\n${source}` });
     const answer = response.output_text?.trim() || GROUNDED_FALLBACK;
-    return { answer, citations: evidence.slice(0, 8).map((x, i) => ({ marker: `[${i + 1}]`, page: x.page, section: x.section, source: x.text })) };
+    return { answer, citations: evidence.slice(0, 12).map((x, i) => ({ marker: `[${i + 1}]`, page: x.page, section: x.section, source: x.text })) };
   }
 }
 
