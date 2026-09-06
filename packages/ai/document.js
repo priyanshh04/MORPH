@@ -12,17 +12,7 @@ export function normalizeText(text = "") {
     .replace(/[ \t]*\n[ \t]*/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-
-  // PDF extraction often produces table-of-contents/page-number noise such as:
-  // "Newly launched scheme ........ 13 2.1.1.". Remove only lines that are
-  // overwhelmingly punctuation/page-number markers; preserve real source text.
-  value = value
-    .split("\n")
-    .map((line) => cleanPdfLine(line))
-    .filter(Boolean)
-    .join("\n");
-
-  // Join sentences that were split across PDF line wraps while keeping headings.
+  value = value.split("\n").map((line) => cleanPdfLine(line)).filter(Boolean).join("\n");
   value = value.replace(/([^.!?:;])\n(?=[a-z])/g, "$1 ");
   return value.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 }
@@ -33,15 +23,12 @@ function cleanPdfLine(line) {
   const compact = s.replace(/\s+/g, " ");
   const withoutDots = compact.replace(/[.·•_\-–—]{3,}/g, " ").trim();
   const pageTail = withoutDots.replace(/\s+(?:\d+\s*){1,4}$/, "").trim();
-
-  // Keep ordinary prose even when it contains numbers. Drop obvious TOC rows.
   const punctuationRatio = (compact.match(/[.·•_\-–—]/g) || []).length / Math.max(1, compact.length);
   const numericTokens = (compact.match(/\b\d+(?:\.\d+)*\b/g) || []).length;
   const wordTokens = compact.split(/\s+/).length;
   if (punctuationRatio > 0.18 && numericTokens >= 1 && numericTokens >= wordTokens / 3) return "";
   if (/^(?:page|contents|table of contents)\s+\d+$/i.test(compact)) return "";
   if (/^(?:\d+\.){1,6}\s*$/.test(compact)) return "";
-
   return pageTail || withoutDots || compact;
 }
 
@@ -50,7 +37,6 @@ export async function parseUploadedContent({ name = "Pasted source", type = "tex
   const supported = ["pdf", "docx", "txt", "md", "markdown"].includes(ext) || type.includes("text");
   let clean = "";
   let parser = "text-extractor";
-
   try {
     if (encoding === "base64") {
       const buffer = Buffer.from(String(content).replace(/^data:[^;]+;base64,/, ""), "base64");
@@ -64,25 +50,13 @@ export async function parseUploadedContent({ name = "Pasted source", type = "tex
         const parsed = await mammoth.extractRawText({ buffer });
         clean = normalizeText(parsed.value || "");
         parser = "mammoth-docx";
-      } else {
-        clean = normalizeText(buffer.toString("utf8"));
-      }
-    } else {
-      clean = normalizeText(content);
-    }
+      } else clean = normalizeText(buffer.toString("utf8"));
+    } else clean = normalizeText(content);
   } catch (error) {
     throw new Error(`Could not parse ${ext || "document"}: ${error.message}`);
   }
-
   if (!clean) clean = demoBodyFor(name);
-  return {
-    title: inferTitle(clean, name),
-    text: clean,
-    fileType: ext || "txt",
-    supported,
-    pages: Math.max(1, Math.ceil(clean.length / 2600)),
-    metadata: { originalName: name, mimeType: type, parser }
-  };
+  return { title: inferTitle(clean, name), text: clean, fileType: ext || "txt", supported, pages: Math.max(1, Math.ceil(clean.length / 2600)), metadata: { originalName: name, mimeType: type, parser } };
 }
 
 function inferTitle(text, name) {
@@ -98,35 +72,25 @@ function demoBodyFor(name) {
 
 export function chunkDocument(documentId, text) {
   const normalized = normalizeText(text);
-  const paragraphs = normalized
-    .split(/\n\s*\n+/)
-    .flatMap((block) => splitIntoSentences(block))
-    .map((x) => x.trim())
-    .filter((x) => x.length >= 12);
-
+  const paragraphs = normalized.split(/\n\s*\n+/).flatMap((block) => splitIntoSentences(block)).map((x) => x.trim()).filter((x) => x.length >= 12);
   const chunks = [];
   let page = 1;
   let buffer = "";
-
   for (const paragraph of paragraphs) {
     const candidate = buffer ? `${buffer} ${paragraph}` : paragraph;
     if (buffer && candidate.length > 1100) {
       chunks.push(makeChunk(documentId, chunks.length, page, buffer));
       page += 1;
       buffer = paragraph;
-    } else {
-      buffer = candidate;
-    }
+    } else buffer = candidate;
   }
   if (buffer) chunks.push(makeChunk(documentId, chunks.length, page, buffer));
-
   return chunks.length ? chunks : [{ id: id("chunk"), documentId, index: 0, page: 1, section: "Source", text: normalized, createdAt: now() }];
 }
 
 function splitIntoSentences(block) {
   const clean = block.replace(/\s+/g, " ").trim();
   if (!clean) return [];
-  // Keep headings attached to the first sentence and split ordinary prose for better retrieval.
   return clean.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).filter(Boolean);
 }
 
@@ -148,35 +112,13 @@ export function analyzeDocument(doc, chunks) {
   const sentences = splitIntoSentences(text).map((s) => s.trim()).filter((s) => s.length > 18);
   const claims = sentences.slice(0, 30).map((claim, idx) => {
     const owningChunk = findBestChunkForClaim(claim, chunks, idx);
-    return {
-      id: id("fact"), documentId: doc.id, claim, citationId: `C${idx + 1}`,
-      page: owningChunk?.page || 1, section: owningChunk?.section || "Source",
-      confidence: claim.match(/\d|must|shall|eligible|deadline|budget|launched|provides|apply/i) ? 0.94 : 0.84,
-      createdAt: now()
-    };
+    return { id: id("fact"), documentId: doc.id, claim, citationId: `C${idx + 1}`, page: owningChunk?.page || 1, section: owningChunk?.section || "Source", confidence: claim.match(/\d|must|shall|eligible|deadline|budget|launched|provides|apply/i) ? 0.94 : 0.84, createdAt: now() };
   });
-
   const entities = extractEntities(text, doc.id);
   const dates = [...text.matchAll(/\b\d{1,2}\s+[A-Z][a-z]+\s+20\d{2}\b|\b20\d{2}\b/g)].map((m) => m[0]);
   const numbers = [...text.matchAll(/(?:INR|₹)?\s?\d[\d,]*(?:\.\d+)?\s?(?:crore|lakh|%|days|PM|AM)?/gi)].map((m) => m[0].trim());
   const topics = topTerms(text).slice(0, 8);
-
-  return {
-    facts: claims,
-    entities,
-    intelligence: {
-      wordCount: text.split(/\s+/).filter(Boolean).length,
-      pages: doc.pages,
-      detectedLanguage: /[\u0900-\u097F]/.test(text) ? "Hindi / Indic" : "English",
-      claimCount: claims.length,
-      entityCount: entities.length,
-      citationCount: (text.match(/\[\d+\]/g) || []).length || Math.min(3, claims.length),
-      topics,
-      dates: [...new Set(dates)].slice(0, 10),
-      numbers: [...new Set(numbers)].slice(0, 10),
-      risks: sentences.filter((s) => /risk|urgent|alert|emergency|must|deadline|suspended/i.test(s)).slice(0, 5)
-    }
-  };
+  return { facts: claims, entities, intelligence: { wordCount: text.split(/\s+/).filter(Boolean).length, pages: doc.pages, detectedLanguage: /[\u0900-\u097F]/.test(text) ? "Hindi / Indic" : "English", claimCount: claims.length, entityCount: entities.length, citationCount: (text.match(/\[\d+\]/g) || []).length || Math.min(3, claims.length), topics, dates: [...new Set(dates)].slice(0, 10), numbers: [...new Set(numbers)].slice(0, 10), risks: sentences.filter((s) => /risk|urgent|alert|emergency|must|deadline|suspended/i.test(s)).slice(0, 5) } };
 }
 
 function findBestChunkForClaim(claim, chunks, fallbackIndex) {
@@ -185,16 +127,14 @@ function findBestChunkForClaim(claim, chunks, fallbackIndex) {
   let bestScore = -1;
   for (const chunk of chunks) {
     const terms = tokenize(chunk.text);
-    const score = claimTerms.reduce((sum, term) => sum + (terms.has(term) ? 1 : 0), 0);
+    const score = [...claimTerms].reduce((sum, term) => sum + (terms.has(term) ? 1 : 0), 0);
     if (score > bestScore) { bestScore = score; best = chunk; }
   }
   return best;
 }
 
 function extractEntities(text, documentId) {
-  const matches = [...text.matchAll(/\b(?:[A-Z][a-z]+|[A-Z]{2,})(?:\s+(?:[A-Z][a-z]+|[A-Z]{2,})){0,5}\b/g)]
-    .map((m) => m[0])
-    .filter((x) => x.length > 2 && !/^(The|This|If|For|Section|Issued|When|What|Where|Which)$/.test(x));
+  const matches = [...text.matchAll(/\b(?:[A-Z][a-z]+|[A-Z]{2,})(?:\s+(?:[A-Z][a-z]+|[A-Z]{2,})){0,5}\b/g)].map((m) => m[0]).filter((x) => x.length > 2 && !/^(The|This|If|For|Section|Issued|When|What|Where|Which)$/.test(x));
   return [...new Set(matches)].slice(0, 18).map((name) => ({ id: id("entity"), documentId, name, type: classifyEntity(name), createdAt: now() }));
 }
 
@@ -226,20 +166,14 @@ export function retrieve(chunks, question, limit = 4) {
       if (chunkTerms.has(term)) score += 3;
       else if (hay.includes(term)) score += 1;
     }
-
-    // Intent-aware boosts make common factual questions land on the sentence that
-    // actually contains the answer rather than a neighbouring TOC/header chunk.
     if (/\bwhen\b|\bdate\b|\blaunched\b|\bstarted\b/.test(questionText) && /launched|issued|started|began|\b20\d{2}\b|\b\d{1,2}\s+[A-Z][a-z]+\s+20\d{2}\b/i.test(hay)) score += 5;
     if (/\bwho\b|\bdepartment\b|\bministry\b/.test(questionText) && /department|ministry|authority|organisation|organization/i.test(hay)) score += 4;
     if (/\bhow much\b|\bamount\b|\bbudget\b|\bprice\b|\bbenefit\b/.test(questionText) && /INR|₹|crore|lakh|amount|benefit/i.test(hay)) score += 5;
     if (/\bdeadline\b|\bwhen.*close|\blast date\b|\bapply\b/.test(questionText) && /close|deadline|apply|submit|\bby\b/i.test(hay)) score += 5;
     if (/\beligib/.test(questionText) && /eligib|qualification|beneficiar/i.test(hay)) score += 5;
-
-    // Strongly penalize tiny numeric/TOC fragments unless they contain a meaningful word.
     const words = hay.split(/\s+/).filter(Boolean).length;
     if (words < 6 && /\d/.test(hay)) score -= 4;
     return { ...chunk, score };
   });
-
   return scored.sort((a, b) => b.score - a.score || a.index - b.index).slice(0, limit);
 }
