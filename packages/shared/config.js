@@ -9,7 +9,7 @@ export const CONFIG = {
   modelName: process.env.MODEL_NAME || "gpt-5.5",
   aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS || 60000),
   maxFactsForPrompt: Number(process.env.MAX_FACTS_FOR_PROMPT || 30),
-  maxUploadMb: Number(process.env.MAX_UPLOAD_MB || 25),
+  maxUploadMb: Number(process.env.MAX_UPLOAD_MB || 50),
   jwtSecret: process.env.JWT_SECRET || (isProduction ? "" : "dev-transformai-secret"),
   databaseUrl: process.env.DATABASE_URL || "",
   dbSsl: String(process.env.DATABASE_SSL || (isProduction ? "true" : "false")).toLowerCase() === "true"
