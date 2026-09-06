@@ -1,13 +1,15 @@
 const isProduction = process.env.NODE_ENV === "production";
 const explicitDemoMode = String(process.env.DEMO_MODE || "").toLowerCase() === "true";
+const useOpenAI = String(process.env.USE_OPENAI || "").toLowerCase() === "true";
 
 export const CONFIG = {
   port: Number(process.env.PORT || 4321),
   isProduction,
   demoMode: explicitDemoMode,
   // MORPH is source-grounded and fully usable without a paid external LLM.
-  // External LLM usage is opt-in only via LLM_PROVIDER=openai.
-  llmProvider: String(process.env.LLM_PROVIDER || "demo").toLowerCase(),
+  // IMPORTANT: an old LLM_PROVIDER=openai value in .env must NOT activate
+  // the paid API. OpenAI is opt-in only when USE_OPENAI=true.
+  llmProvider: useOpenAI ? "openai" : "demo",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   modelName: process.env.MODEL_NAME || "gpt-5.6-luna",
   aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS || 60000),
@@ -19,7 +21,7 @@ export const CONFIG = {
 };
 
 if (CONFIG.llmProvider === "openai" && !CONFIG.openaiApiKey) {
-  throw new Error("LLM_PROVIDER=openai requires OPENAI_API_KEY. Add it to .env locally or your deployment environment.");
+  throw new Error("USE_OPENAI=true requires OPENAI_API_KEY. Leave USE_OPENAI unset to use MORPH's free local engine.");
 }
 
 if (CONFIG.isProduction) {
