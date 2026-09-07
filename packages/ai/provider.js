@@ -1,4 +1,5 @@
 import { OUTPUT_TYPES } from "../shared/config.js";
+import { questionIntent } from "./document.js";
 
 const HINDI_HINT = {
   "Citizen Simplifier": "Yeh suchna nagrikon ke liye saral bhasha mein hai.",
@@ -44,13 +45,108 @@ export class DemoAIProvider {
   }
 
   async chat({ question, evidence }) {
-    const relevant = evidence.filter((x) => x.score > 0);
-    if (!relevant.length) return { answer: "I couldn't find this information in the provided source.", citations: [] };
+    const intent = questionIntent(question);
+    const candidates = evidence.flatMap((chunk) => splitSentences(chunk.text).map((text) => ({
+      ...chunk,
+      text,
+      score: sentenceScore(text, chunk, question, intent)
+    })));
+
+    const ranked = candidates
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score || a.index - b.index);
+
+    if (!ranked.length) {
+      return {
+        answer: "I couldn't find this information in the provided source. The source does not contain enough evidence to answer this question reliably.",
+        citations: []
+      };
+    }
+
+    const selected = selectAnswerSentences(ranked, intent);
+    if (!selected.length) {
+      return {
+        answer: "I couldn't verify this information from the provided source.",
+        citations: []
+      };
+    }
+
+    const answer = selected.map((x, i) => `${plain(x.text)} [${i + 1}]`).join(" ");
     return {
-      answer: `${plain(relevant[0].text)} [1]`,
-      citations: relevant.slice(0, 3).map((x, i) => ({ marker: `[${i + 1}]`, page: x.page, section: x.section, source: x.text }))
+      answer,
+      citations: selected.map((x, i) => ({
+        marker: `[${i + 1}]`,
+        page: x.page,
+        section: x.section,
+        source: x.text
+      }))
     };
   }
+}
+
+function splitSentences(text = "") {
+  return String(text)
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?])\s+|\s*[•·]\s+|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 12);
+}
+
+function sentenceScore(text, chunk, question, intent) {
+  const q = String(question || "").toLowerCase();
+  const hay = text.toLowerCase();
+  let score = Number(chunk.score || 0);
+
+  const intentPatterns = {
+    launch: [/\blaunch(?:ed|es|ing)?\b/, /\bintroduc(?:ed|es|ing)?\b/, /\bstart(?:ed|s)?\b/, /\bcommenc(?:ed|es|ing)?\b/, /\b20\d{2}\b/, /\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b/],
+    eligibility: [/\beligib(?:le|ility)\b/, /\bqualif(?:y|ied|ication)\b/, /\bapplicable\b/, /\bwho can\b/, /\bhouseholds?\b/, /\bfarmers?\b/, /\bstudents?\b/],
+    benefits: [/\bbenefit(?:s)?\b/, /\bassistance\b/, /\bsupport\b/, /\bprovid(?:e|es|ed|ing)\b/, /\breceive\b/, /\bentitled\b/, /\bgrant\b/, /\bsubsidy\b/],
+    count: [/\btotal\b/, /\bnumber\b/, /\bcount\b/, /\bhow many\b/, /\b\d+\s+(?:schemes?|program(?:me)?s?)\b/],
+    deadline: [/\bdeadline\b/, /\bclos(?:e|es|ed|ing)\b/, /\blast date\b/, /\bby \d\b/, /\bexpires?\b/],
+    amount: [/\bINR\b/, /₹/, /\bcrore\b/, /\blakh\b/, /\bbudget\b/, /\boutlay\b/, /\bamount\b/],
+    location: [/\bdistrict\b/, /\bstate\b/, /\bthrough\b/, /\bavailable\b/, /\blocated\b/],
+    requirement: [/\brequired\b/, /\brequirements?\b/, /\bdocuments?\b/, /\bmust\b/, /\bapply\b/],
+    general: []
+  };
+
+  for (const pattern of intentPatterns[intent] || []) if (pattern.test(hay)) score += 10;
+  if (chunk.section && intentSection(intent) === chunk.section) score += 18;
+  if (q.length > 8 && hay.includes(q)) score += 25;
+
+  const questionTerms = q.match(/[a-z0-9]+/g) || [];
+  for (const term of questionTerms) {
+    if (term.length > 2 && hay.includes(term)) score += 2;
+  }
+  return score;
+}
+
+function intentSection(intent) {
+  return {
+    eligibility: "Eligibility",
+    benefits: "Benefits",
+    deadline: "Deadlines",
+    amount: "Financial Details"
+  }[intent] || "";
+}
+
+function selectAnswerSentences(ranked, intent) {
+  const top = ranked[0];
+  if (!top) return [];
+
+  // For factual lookup questions, return only the strongest source sentence(s).
+  // This prevents an entire unrelated paragraph/chunk from becoming the answer.
+  if (["launch", "eligibility", "benefits", "deadline", "amount", "location", "requirement"].includes(intent)) {
+    const threshold = Math.max(12, top.score - 8);
+    return ranked.filter((x) => x.score >= threshold).slice(0, 2);
+  }
+
+  if (intent === "count") {
+    const explicit = ranked.filter((x) => /\b(total|number|count|how many)\b.*\b\d+\b|\b\d+\s+(?:schemes?|program(?:me)?s?)\b/i.test(x.text));
+    if (explicit.length) return explicit.slice(0, 2);
+    return ranked.filter((x) => /\b(total|number|count|how many)\b/i.test(x.text)).slice(0, 2);
+  }
+
+  return ranked.slice(0, 2);
 }
 
 export function createProvider() {
