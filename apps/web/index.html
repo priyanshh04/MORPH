@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="MORPH — Multiformat Output & Representation Processing Hub." />
-    <meta name="theme-color" content="#172635" />
+    <meta name="theme-color" content="#060a0f" />
     <title>MORPH — Multiformat Output & Representation Processing Hub</title>
-    <link rel="stylesheet" href="/styles.css?v=20260907.6" />
+    <link rel="stylesheet" href="/styles.css?v=20260907.7" />
     <style>
       html, body { font-size: 17px; }
       button, input, select, textarea { font-size: 16px; }
@@ -34,91 +34,107 @@
       }
       .output-card pre { margin: 10px 0 0; line-height: 1.7; }
 
-      /* MORPH hybrid visual system: mostly light, with a restrained dark shell. */
+      /* MORPH dark visual system: restore the original dark workspace. */
       :root {
-        --bg: #eef2f5;
-        --panel: #ffffff;
-        --panel2: #f7f9fb;
-        --line: #d4dde5;
-        --line2: #e4eaf0;
-        --ink: #172635;
-        --muted: #5d7082;
-        --faint: #7c8d9d;
-        --brand: #0f8f8b;
-        --accent: #9b6800;
-        --ok: #16784d;
-        --warn: #9a6500;
-        --danger: #c43d3d;
+        --bg: #060a0f;
+        --panel: #0b141d;
+        --panel2: #101c27;
+        --line: #27465c;
+        --line2: #1d3547;
+        --ink: #edf4f8;
+        --muted: #9aabba;
+        --faint: #708597;
+        --brand: #59d6d1;
+        --accent: #d4a943;
+        --ok: #4fc58b;
+        --warn: #d4a24b;
+        --danger: #ef6b6b;
+        --shadow: 0 10px 30px rgba(0,0,0,.24);
       }
 
-      html, body { background: #eef2f5 !important; color: #172635 !important; }
-      .landing { background: radial-gradient(circle at 82% 15%, rgba(45,108,223,.08), transparent 33%), radial-gradient(circle at 10% 80%, rgba(15,143,139,.07), transparent 30%), #eef2f5 !important; }
-      .topbar { background: #ffffff !important; color: #172635 !important; }
-      .app-shell { background: #eef2f5 !important; }
-      .main { background: #eef2f5 !important; }
+      html, body { background: #060a0f !important; color: #edf4f8 !important; }
+      .landing { background: radial-gradient(circle at 82% 15%, rgba(45,108,223,.08), transparent 33%), radial-gradient(circle at 10% 80%, rgba(15,143,139,.07), transparent 30%), #060a0f !important; }
+      .topbar { background: #081019 !important; color: #edf4f8 !important; border-color: #203b4e !important; }
+      .app-shell, .main { background: #060a0f !important; }
 
-      /* Keep only the navigation chrome dark for visual contrast. */
       .sidebar {
-        background: #172635 !important;
-        color: #eef5f8 !important;
-        border-right: 1px solid #263b4c !important;
+        background: #081019 !important;
+        color: #dce8ee !important;
+        border-right: 1px solid #203b4e !important;
       }
-      .sidebar-brand, .sidebar-brand * { color: #f4f8fa; }
-      .sidebar .secure-badge {
-        background: #203443 !important;
-        border-color: #355064 !important;
-        color: #c6d4de !important;
+      .sidebar-brand, .sidebar-brand * { color: #edf4f8 !important; }
+      .secure-badge {
+        background: #0d1822 !important;
+        border-color: #29485d !important;
+        color: #9eb1c0 !important;
       }
-      .sidebar .nav button { color: #b8c8d3 !important; background: transparent !important; border-color: transparent !important; }
-      .sidebar .nav button span { color: #91a7b7 !important; }
+      .sidebar .nav button { color: #91a5b5 !important; background: transparent !important; border-color: transparent !important; }
+      .sidebar .nav button span { color: #6f8799 !important; }
       .sidebar .nav button.active,
       .sidebar .nav button:hover {
-        background: #263d4e !important;
-        border-color: #3a566b !important;
-        color: #ffffff !important;
+        background: #10212d !important;
+        border-color: #2c5067 !important;
+        color: #f5fafc !important;
       }
-      .sidebar .nav button.active span { color: #55d6d0 !important; }
+      .sidebar .nav button.active span { color: #59d6d1 !important; }
       .sidebar-source {
-        background: #203443 !important;
-        border-color: #355064 !important;
-        color: #dce7ed !important;
+        background: #0d1822 !important;
+        border-color: #29485d !important;
+        color: #dce8ee !important;
       }
-      .sidebar-source > span, .sidebar-source > small { color: #9eb2c0 !important; }
-      .sidebar-source b { color: #f2f7fa !important; }
-      .user-box { border-top-color: #355064 !important; color: #dce7ed !important; }
-      .user-box small { color: #9eb2c0 !important; }
+      .sidebar-source > span, .sidebar-source > small { color: #7890a1 !important; }
+      .sidebar-source b { color: #edf4f8 !important; }
+      .user-box { border-top-color: #29485d !important; color: #dce8ee !important; }
+      .user-box small { color: #7890a1 !important; }
 
-      /* Light working surface. */
       .panel, .metric-card, .output-card, .landing-console {
-        background: #ffffff !important;
-        color: #172635 !important;
-        border-color: #d4dde5 !important;
+        background: #0b141d !important;
+        color: #edf4f8 !important;
+        border-color: #27465c !important;
       }
       .flow-step, .pipeline-preview > div, .source-summary, .output-option, .msg, .compare-grid > div, .intel-grid div {
-        background: #f7f9fb !important;
-        border-color: #dfe6ec !important;
+        background: #0e1923 !important;
+        border-color: #1d3b50 !important;
       }
       input, select, textarea, .content-editor {
-        background: #fbfcfd !important;
-        color: #172635 !important;
-        border-color: #cbd7e1 !important;
+        background: #08121b !important;
+        color: #edf4f8 !important;
+        border-color: #294b62 !important;
       }
-      input::placeholder, textarea::placeholder { color: #8797a6 !important; opacity: 1; }
-      .drop { background: #f7fafc !important; border-color: #8fa9bb !important; }
-      .drop:hover, .drop.active { background: #effaf9 !important; }
-      .result-tabs button { background: #ffffff !important; color: #42576a !important; }
-      .result-tabs button.active { background: #eaf7f6 !important; color: #08736f !important; }
-      .content-editor { min-height: 420px !important; max-height: none !important; overflow: auto !important; white-space: pre-wrap !important; overflow-wrap: anywhere !important; line-height: 1.75 !important; font-size: 16px !important; }
-      .output-card h3, .output-card b, .section-head h2, .main-top h1 { color: #172635 !important; }
-      .table th { color: #667a8d !important; }
-      .table td, .compare-grid li { color: #43576a !important; }
-      .helper, .output-meta, .trace span, .feature p { color: #627588 !important; }
-      #toast { background: #172635 !important; border-color: #355064 !important; }
+      input::placeholder, textarea::placeholder { color: #718596 !important; opacity: 1; }
+      .drop { background: #08121b !important; border-color: #31536a !important; }
+      .drop:hover, .drop.active { background: #0b2025 !important; }
+      button { background: #0b141d; color: #edf4f8; border-color: #294b62; }
+      button.ghost { background: #0b141d !important; color: #edf4f8 !important; }
+      button.primary { background: #59d6d1 !important; color: #061114 !important; }
+      .result-tabs button { background: #0b141d !important; color: #a9bbc8 !important; }
+      .result-tabs button.active { background: #102b31 !important; color: #59d6d1 !important; border-color: #2d6970 !important; }
+      .content-editor {
+        min-height: 420px !important;
+        max-height: none !important;
+        overflow: auto !important;
+        white-space: pre-wrap !important;
+        overflow-wrap: anywhere !important;
+        line-height: 1.75 !important;
+        font-size: 16px !important;
+      }
+      .output-card h3, .output-card b, .section-head h2, .main-top h1 { color: #edf4f8 !important; }
+      .table th { color: #8fa5b5 !important; }
+      .table td, .compare-grid li { color: #b2c0ca !important; }
+      .helper, .output-meta, .trace span, .feature p { color: #8296a6 !important; }
+      .status-pill, .session-badge, .mode-chip { background: #0c1821 !important; color: #9fb2c0 !important; border-color: #29485d !important; }
+      .status-pill.ok, .session-badge { background: #0b211b !important; border-color: #245a49 !important; color: #65d49d !important; }
+      .status-pill.warn, .score { background: #211b0d !important; border-color: #695522 !important; color: #d9b65b !important; }
+      .chip, .cap-strip span { background: #0b2525 !important; border-color: #235b5a !important; color: #5ed4ce !important; }
+      .risk-box, .decoy-box { background: #211b0d !important; border-color: #695522 !important; color: #d9b65b !important; }
+      .demo-credentials { background: #0b2525 !important; border-color: #235b5a !important; color: #a9c3c5 !important; }
+      .demo-credentials b { color: #5ed4ce !important; }
+      #toast { background: #101c27 !important; border-color: #31536a !important; color: #edf4f8 !important; }
     </style>
   </head>
   <body>
     <div id="app"></div>
     <div id="toast" aria-live="polite"></div>
-    <script type="module" src="/app.js?v=20260907.6"></script>
+    <script type="module" src="/app.js?v=20260907.7"></script>
   </body>
 </html>
