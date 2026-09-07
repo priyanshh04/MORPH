@@ -1,6 +1,6 @@
 import { id, now } from "../database/store.js";
 
-const STOP = new Set("the and for with from this that have will are was were has into shall should would could about above below where which when what who whom your their there here been being through using under over such not its also than then them they you our out use can may per via".split(" "));
+const STOP = new Set("the and for with from this that have will are was were has into shall should would could about above below where which when what who whom your their there here been being through using under over such not its also than then them they you our out use can may per via is a an of to in on as by be do does did how why it we they these those this all total number many scheme schemes provided provide benefit benefits eligible eligibility launched launch date dates year years".split(" "));
 
 export function normalizeText(text = "") {
   return String(text).replace(/\r/g, "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
@@ -52,6 +52,7 @@ export function chunkDocument(documentId, text) {
 function detectSection(text, i) {
   if (i === 0) return "Title / Overview";
   if (/eligib/i.test(text)) return "Eligibility";
+  if (/benefit|advantage|assistance/i.test(text)) return "Benefits";
   if (/deadline|close|by \d/i.test(text)) return "Deadlines";
   if (/budget|INR|₹|crore|lakh/i.test(text)) return "Financial Details";
   if (/risk|alert|emergency|urgent|suspended/i.test(text)) return "Risk / Advisory";
@@ -66,13 +67,13 @@ export function analyzeDocument(doc, chunks) {
     documentId: doc.id,
     claim,
     citationId: `C${idx + 1}`,
-    page: chunks[Math.min(idx, chunks.length - 1)]?.page || 1,
-    section: chunks[Math.min(idx, chunks.length - 1)]?.section || "Source",
-    confidence: claim.match(/\d|must|shall|eligible|deadline|budget|launched/i) ? 0.94 : 0.84,
+    page: locatePage(claim, chunks),
+    section: locateSection(claim, chunks),
+    confidence: claim.match(/\d|must|shall|eligible|deadline|budget|launched|benefit/i) ? 0.94 : 0.84,
     createdAt: now()
   }));
   const entities = extractEntities(text, doc.id);
-  const dates = [...text.matchAll(/\b\d{1,2}\s+[A-Z][a-z]+\s+20\d{2}\b|\b20\d{2}\b/g)].map((m) => m[0]);
+  const dates = [...text.matchAll(/\b\d{1,2}\s+(?:[A-Z][a-z]+|[A-Z][a-z]+,)\s+20\d{2}\b|\b20\d{2}\b/g)].map((m) => m[0]);
   const numbers = [...text.matchAll(/(?:INR|₹)?\s?\d[\d,]*(?:\.\d+)?\s?(?:crore|lakh|%|days|PM|AM)?/gi)].map((m) => m[0].trim());
   const topics = topTerms(text).slice(0, 8);
   return {
@@ -91,6 +92,14 @@ export function analyzeDocument(doc, chunks) {
       risks: sentences.filter((s) => /risk|urgent|alert|emergency|must|deadline|suspended/i.test(s)).slice(0, 5)
     }
   };
+}
+
+function locatePage(text, chunks) {
+  return chunks.find((c) => c.text.includes(text))?.page || chunks[0]?.page || 1;
+}
+
+function locateSection(text, chunks) {
+  return chunks.find((c) => c.text.includes(text))?.section || "Source";
 }
 
 function extractEntities(text, documentId) {
@@ -117,14 +126,51 @@ function topTerms(text) {
   return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([w]) => w);
 }
 
-export function retrieve(chunks, question, limit = 4) {
-  const terms = new Set((question.toLowerCase().match(/[a-z0-9]+/g) || []).filter((x) => !STOP.has(x)));
+const INTENT_TERMS = {
+  launch: ["launched", "launch", "introduced", "started", "commenced", "from", "on"],
+  eligibility: ["eligible", "eligibility", "qualify", "qualification", "who can", "applicable"],
+  benefits: ["benefit", "benefits", "assistance", "support", "provided", "receive", "amount"],
+  count: ["total", "number", "count", "how many", "schemes", "programmes", "programs"],
+  deadline: ["deadline", "close", "closing", "last date", "by when", "expires"],
+  amount: ["amount", "cost", "budget", "outlay", "fund", "money", "how much"],
+  location: ["where", "district", "state", "location", "through", "available"],
+  requirement: ["required", "requirements", "documents", "must", "need to", "apply"]
+};
+
+export function questionIntent(question = "") {
+  const q = question.toLowerCase();
+  if (/\b(when|date|year)\b/.test(q) && /(launch|start|introduc|commenc)/.test(q)) return "launch";
+  if (/\bwho\b/.test(q) && /(eligible|qualif|applicable)/.test(q)) return "eligibility";
+  if (/(benefit|assistance|support|provided|receive|entitled)/.test(q)) return "benefits";
+  if (/(total|number|count|how many)/.test(q)) return "count";
+  if (/(deadline|closing|last date|by when|expire)/.test(q)) return "deadline";
+  if (/(amount|cost|budget|outlay|fund|money|how much)/.test(q)) return "amount";
+  if (/(where|district|state|location|through where)/.test(q)) return "location";
+  if (/(required|requirement|documents|must|need to|apply)/.test(q)) return "requirement";
+  return "general";
+}
+
+export function retrieve(chunks, question, limit = 8) {
+  const q = question.toLowerCase().trim();
+  const terms = new Set((q.match(/[a-z0-9]+/g) || []).filter((x) => !STOP.has(x) && x.length > 1));
+  const intent = questionIntent(question);
+  const intentTerms = INTENT_TERMS[intent] || [];
   return chunks
     .map((chunk) => {
       const hay = chunk.text.toLowerCase();
-      const score = [...terms].reduce((sum, term) => sum + (hay.includes(term) ? 1 : 0), 0);
+      let score = 0;
+      for (const term of terms) if (hay.includes(term)) score += 2;
+      for (const term of intentTerms) if (hay.includes(term)) score += intent === "general" ? 1 : 4;
+      if (q.length > 8 && hay.includes(q)) score += 12;
+      if (intent === "eligibility" && chunk.section === "Eligibility") score += 8;
+      if (intent === "benefits" && chunk.section === "Benefits") score += 8;
+      if (intent === "deadline" && chunk.section === "Deadlines") score += 8;
+      if (intent === "amount" && chunk.section === "Financial Details") score += 8;
+      if (intent === "launch" && /launched|launch|introduced|commenced|started/.test(hay)) score += 8;
+      if (intent === "count" && /(total|number|count|scheme|program)/.test(hay)) score += 3;
       return { ...chunk, score };
     })
-    .sort((a, b) => b.score - a.score)
+    .filter((chunk) => chunk.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
     .slice(0, limit);
 }
