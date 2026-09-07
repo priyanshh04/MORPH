@@ -2,34 +2,26 @@ import { id, now } from "../database/store.js";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 
-const STOP = new Set("the and for with from this that have will are was were has into shall should would could about above below where which when what who whom your their there here been being through using under over such not its also than then them they our out use can may per via a an as is of to in on at by or be it if how why does did do these those whose been being".split(" "));
+const STOP = new Set("the and for with from this that have will are was were has into shall should would could about above below where which when what who whom your their there here been being through using under over such not its also than then them they our out use can may per via a an as is of to in on at by or be it if how why does did do these those whose scheme schemes document source information government department ministry page pages table contents news".split(" "));
 
 export function normalizeText(text = "") {
-  let value = String(text)
-    .replace(/\r/g, "")
-    .replace(/\u00a0/g, " ")
-    .replace(/[ \t]+/g, " ")
-    .replace(/[ \t]*\n[ \t]*/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-  value = value.split("\n").map((line) => cleanPdfLine(line)).filter(Boolean).join("\n");
-  value = value.replace(/([^.!?:;])\n(?=[a-z])/g, "$1 ");
-  return value.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  const raw = String(text).replace(/\r/g, "").replace(/\u00a0/g, " ");
+  const lines = raw.split("\n").map((line) => cleanPdfLine(line)).filter(Boolean);
+  const joined = lines.join("\n");
+  return joined.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").replace(/([^.!?:;])\n(?=[a-z])/g, "$1 ").trim();
 }
 
 function cleanPdfLine(line) {
-  const s = String(line).trim();
+  let s = String(line).replace(/\s+/g, " ").trim();
   if (!s) return "";
-  const compact = s.replace(/\s+/g, " ");
-  const withoutDots = compact.replace(/[.·•_\-–—]{3,}/g, " ").trim();
-  const pageTail = withoutDots.replace(/\s+(?:\d+\s*){1,4}$/, "").trim();
-  const punctuationRatio = (compact.match(/[.·•_\-–—]/g) || []).length / Math.max(1, compact.length);
-  const numericTokens = (compact.match(/\b\d+(?:\.\d+)*\b/g) || []).length;
-  const wordTokens = compact.split(/\s+/).length;
-  if (punctuationRatio > 0.18 && numericTokens >= 1 && numericTokens >= wordTokens / 3) return "";
-  if (/^(?:page|contents|table of contents)\s+\d+$/i.test(compact)) return "";
-  if (/^(?:\d+\.){1,6}\s*$/.test(compact)) return "";
-  return pageTail || withoutDots || compact;
+  const dots = (s.match(/[.·•_–—-]/g) || []).length;
+  const numbers = (s.match(/\b\d+(?:\.\d+)*\b/g) || []).length;
+  const words = s.split(/\s+/).length;
+  if (dots >= 5 && (dots / Math.max(1, s.length) > 0.08 || numbers >= Math.max(1, Math.floor(words / 3)))) return "";
+  if (/^(?:page|contents|table of contents|chapter)\s*(?:\d+)?$/i.test(s)) return "";
+  if (/^(?:\d+\.){1,8}\s*$/.test(s)) return "";
+  s = s.replace(/[.·•_–—-]{3,}/g, " ").replace(/\s+(?:\d+\s*){1,5}$/g, "").trim();
+  return s;
 }
 
 export async function parseUploadedContent({ name = "Pasted source", type = "text/plain", content = "", encoding = "text" }) {
@@ -52,16 +44,14 @@ export async function parseUploadedContent({ name = "Pasted source", type = "tex
         parser = "mammoth-docx";
       } else clean = normalizeText(buffer.toString("utf8"));
     } else clean = normalizeText(content);
-  } catch (error) {
-    throw new Error(`Could not parse ${ext || "document"}: ${error.message}`);
-  }
+  } catch (error) { throw new Error(`Could not parse ${ext || "document"}: ${error.message}`); }
   if (!clean) clean = demoBodyFor(name);
   return { title: inferTitle(clean, name), text: clean, fileType: ext || "txt", supported, pages: Math.max(1, Math.ceil(clean.length / 2600)), metadata: { originalName: name, mimeType: type, parser } };
 }
 
 function inferTitle(text, name) {
   const first = text.split("\n").map((x) => x.trim()).find(Boolean);
-  return first && first.length < 120 ? first.replace(/^#+\s*/, "") : name.replace(/\.[^.]+$/, "");
+  return first && first.length < 160 ? first.replace(/^#+\s*/, "") : name.replace(/\.[^.]+$/, "");
 }
 
 function demoBodyFor(name) {
@@ -72,123 +62,87 @@ function demoBodyFor(name) {
 
 export function chunkDocument(documentId, text) {
   const normalized = normalizeText(text);
-  const paragraphs = normalized.split(/\n\s*\n+/).flatMap((block) => splitIntoSentences(block)).map((x) => x.trim()).filter((x) => x.length >= 12);
+  const blocks = normalized.split(/\n\s*\n+/).flatMap((block) => splitIntoSentences(block)).map((x) => x.trim()).filter((x) => x.length >= 20);
   const chunks = [];
   let page = 1;
   let buffer = "";
-  for (const paragraph of paragraphs) {
-    const candidate = buffer ? `${buffer} ${paragraph}` : paragraph;
-    if (buffer && candidate.length > 1100) {
-      chunks.push(makeChunk(documentId, chunks.length, page, buffer));
-      page += 1;
-      buffer = paragraph;
-    } else buffer = candidate;
+  for (const sentence of blocks) {
+    const candidate = buffer ? `${buffer} ${sentence}` : sentence;
+    if (buffer && candidate.length > 1100) { chunks.push(makeChunk(documentId, chunks.length, page, buffer)); page += 1; buffer = sentence; }
+    else buffer = candidate;
   }
   if (buffer) chunks.push(makeChunk(documentId, chunks.length, page, buffer));
   return chunks.length ? chunks : [{ id: id("chunk"), documentId, index: 0, page: 1, section: "Source", text: normalized, createdAt: now() }];
 }
 
 function splitIntoSentences(block) {
-  const clean = block.replace(/\s+/g, " ").trim();
-  if (!clean) return [];
-  return clean.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).filter(Boolean);
+  return String(block).replace(/\s+/g, " ").trim().split(/(?<=[.!?])\s+(?=[A-Z0-9])/).filter(Boolean);
 }
-
-function makeChunk(documentId, index, page, text) {
-  return { id: id("chunk"), documentId, index, page, section: detectSection(text, index), text, createdAt: now() };
-}
-
+function makeChunk(documentId, index, page, text) { return { id: id("chunk"), documentId, index, page, section: detectSection(text, index), text, createdAt: now() }; }
 function detectSection(text, i) {
   if (i === 0) return "Title / Overview";
-  if (/eligib|eligible|qualification|beneficiar/i.test(text)) return "Eligibility";
-  if (/deadline|close|by \d|due|last date|submit/i.test(text)) return "Deadlines";
-  if (/budget|INR|₹|crore|lakh|amount|fund/i.test(text)) return "Financial Details";
-  if (/risk|alert|emergency|urgent|suspended|warning|hazard/i.test(text)) return "Risk / Advisory";
+  if (/eligib|eligible|qualification|beneficiar|applicant/i.test(text)) return "Eligibility";
+  if (/deadline|close|by \d|due|last date|submit|apply/i.test(text)) return "Deadlines / Applications";
+  if (/budget|INR|₹|crore|lakh|amount|fund|benefit/i.test(text)) return "Financial Details";
+  if (/risk|alert|emergency|urgent|suspended|warning|hazard|closed/i.test(text)) return "Risk / Advisory";
   return "Source Section";
 }
 
 export function analyzeDocument(doc, chunks) {
   const text = normalizeText(doc.text);
-  const sentences = splitIntoSentences(text).map((s) => s.trim()).filter((s) => s.length > 18);
-  const claims = sentences.slice(0, 30).map((claim, idx) => {
-    const owningChunk = findBestChunkForClaim(claim, chunks, idx);
-    return { id: id("fact"), documentId: doc.id, claim, citationId: `C${idx + 1}`, page: owningChunk?.page || 1, section: owningChunk?.section || "Source", confidence: claim.match(/\d|must|shall|eligible|deadline|budget|launched|provides|apply/i) ? 0.94 : 0.84, createdAt: now() };
+  const sentences = splitIntoSentences(text).map((s) => s.trim()).filter(isUsableClaim);
+  const facts = rankClaims(sentences).slice(0, 40).map((claim, idx) => {
+    const owningChunk = findBestChunkForClaim(claim, chunks);
+    return { id: id("fact"), documentId: doc.id, claim, citationId: `C${idx + 1}`, page: owningChunk?.page || 1, section: owningChunk?.section || "Source", confidence: factConfidence(claim), createdAt: now() };
   });
   const entities = extractEntities(text, doc.id);
-  const dates = [...text.matchAll(/\b\d{1,2}\s+[A-Z][a-z]+\s+20\d{2}\b|\b20\d{2}\b/g)].map((m) => m[0]);
-  const numbers = [...text.matchAll(/(?:INR|₹)?\s?\d[\d,]*(?:\.\d+)?\s?(?:crore|lakh|%|days|PM|AM)?/gi)].map((m) => m[0].trim());
-  const topics = topTerms(text).slice(0, 8);
-  return { facts: claims, entities, intelligence: { wordCount: text.split(/\s+/).filter(Boolean).length, pages: doc.pages, detectedLanguage: /[\u0900-\u097F]/.test(text) ? "Hindi / Indic" : "English", claimCount: claims.length, entityCount: entities.length, citationCount: (text.match(/\[\d+\]/g) || []).length || Math.min(3, claims.length), topics, dates: [...new Set(dates)].slice(0, 10), numbers: [...new Set(numbers)].slice(0, 10), risks: sentences.filter((s) => /risk|urgent|alert|emergency|must|deadline|suspended/i.test(s)).slice(0, 5) } };
+  const dates = uniqueMatches(text, /\b(?:\d{1,2}\s+)?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+20\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b|\b20\d{2}\b/gi);
+  const numbers = uniqueMatches(text, /(?:INR|₹)\s?[\d,]+(?:\.\d+)?(?:\s?(?:crore|lakh|million|thousand))?|\b\d[\d,]*(?:\.\d+)?\s?(?:crore|lakh|%|days|PM|AM)\b/gi);
+  const topics = topTerms(text).slice(0, 10);
+  return { facts, entities, intelligence: { wordCount: text.split(/\s+/).filter(Boolean).length, pages: doc.pages, detectedLanguage: /[\u0900-\u097F]/.test(text) ? "Hindi / Indic" : "English", claimCount: facts.length, entityCount: entities.length, citationCount: (text.match(/\[\d+\]/g) || []).length || Math.min(5, facts.length), topics, dates, numbers, risks: facts.filter((f) => /risk|urgent|alert|emergency|must|deadline|suspended|closed/i.test(f.claim)).slice(0, 6).map((f) => f.claim) } };
 }
 
-function findBestChunkForClaim(claim, chunks, fallbackIndex) {
-  const claimTerms = tokenize(claim);
-  let best = chunks[fallbackIndex] || chunks[0];
-  let bestScore = -1;
-  for (const chunk of chunks) {
-    const terms = tokenize(chunk.text);
-    const score = [...claimTerms].reduce((sum, term) => sum + (terms.has(term) ? 1 : 0), 0);
-    if (score > bestScore) { bestScore = score; best = chunk; }
-  }
+function isUsableClaim(s) {
+  const t = String(s).replace(/\s+/g, " ").trim();
+  if (t.length < 28 || t.length > 900) return false;
+  if (/^[\d\s.,:;\-–—]+$/.test(t)) return false;
+  if (/^[A-Z\s]{14,}$/.test(t) && !/[.!?]/.test(t)) return false;
+  if (/\.\s*\.\s*\.|\.\.\.\s*\d+$/i.test(t)) return false;
+  if (/^(?:table of contents|contents|page|chapter)\b/i.test(t)) return false;
+  if (/^[A-Z][A-Z\s&,-]{20,}\s+\d+(?:\s+[A-Z][A-Z\s&,-]{3,}){2,}$/i.test(t)) return false;
+  return true;
+}
+function rankClaims(sentences) {
+  const seen = new Set();
+  return sentences.map((s, i) => ({ s, i, score: claimScore(s) })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score || a.i - b.i).filter((x) => { const k = normalize(x.s); if (seen.has(k)) return false; seen.add(k); return true; }).map((x) => x.s);
+}
+function claimScore(s) {
+  let score = 5;
+  if (/\b\d{4}\b|\d[/-]\d|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b/i.test(s)) score += 8;
+  if (/INR|₹|crore|lakh|%|amount|budget|benefit|fund/i.test(s)) score += 6;
+  if (/must|shall|required|eligible|apply|submit|deadline|provides?|launched|issued|announced|introduced/i.test(s)) score += 6;
+  if (/\.\.\.|·|•/.test(s)) score -= 20;
+  if (/^(?:newly launched scheme|government schemes in news|table of contents)/i.test(s)) score -= 30;
+  return score;
+}
+function factConfidence(s) { return /\d|must|shall|eligible|deadline|budget|launched|provides|apply/i.test(s) ? 0.95 : 0.88; }
+function findBestChunkForClaim(claim, chunks) {
+  const terms = tokenize(claim); let best = chunks[0]; let bestScore = -1;
+  for (const chunk of chunks) { const ct = tokenize(chunk.text); const score = [...terms].reduce((sum, t) => sum + (ct.has(t) ? 1 : 0), 0); if (score > bestScore) { bestScore = score; best = chunk; } }
   return best;
 }
-
 function extractEntities(text, documentId) {
-  const matches = [...text.matchAll(/\b(?:[A-Z][a-z]+|[A-Z]{2,})(?:\s+(?:[A-Z][a-z]+|[A-Z]{2,})){0,5}\b/g)].map((m) => m[0]).filter((x) => x.length > 2 && !/^(The|This|If|For|Section|Issued|When|What|Where|Which)$/.test(x));
-  return [...new Set(matches)].slice(0, 18).map((name) => ({ id: id("entity"), documentId, name, type: classifyEntity(name), createdAt: now() }));
+  const matches = [...text.matchAll(/\b(?:[A-Z][a-z]+|[A-Z]{2,})(?:\s+(?:[A-Z][a-z]+|[A-Z]{2,})){0,5}\b/g)].map((m) => m[0]).filter((x) => x.length > 2 && !/^(The|This|That|When|What|Where|Which|Issued|Section|Source|Table|Contents)$/.test(x));
+  return [...new Set(matches)].slice(0, 24).map((name) => ({ id: id("entity"), documentId, name, type: classifyEntity(name), createdAt: now() }));
 }
+function classifyEntity(name) { if (/Department|Ministry|Authority|Organisation|Organization/i.test(name)) return "Organization"; if (/India|District|Block|State|City|Coastal/i.test(name)) return "Location"; if (/Scheme|Policy|Alert|Notification/i.test(name)) return "Program / Document"; return "Entity"; }
+function tokenize(text) { return new Set((String(text).toLowerCase().match(/[a-z0-9]+/g) || []).filter((x) => x.length > 1 && !STOP.has(x))); }
+function topTerms(text) { const counts = {}; for (const w of String(text).toLowerCase().match(/[a-z]{4,}/g) || []) if (!STOP.has(w)) counts[w] = (counts[w] || 0) + 1; return Object.entries(counts).sort((a,b) => b[1]-a[1]).map(([w]) => w); }
+function uniqueMatches(text, re) { return [...new Set(String(text).match(re) || [])]; }
 
-function classifyEntity(name) {
-  if (/Department|Ministry|Authority|Organisation|Organization|NTRO|NCIIPC/i.test(name)) return "Organization";
-  if (/India|District|Block|State|City|Coastal/i.test(name)) return "Location";
-  if (/Scheme|Policy|Alert|Notification/i.test(name)) return "Program / Document";
-  return "Entity";
-}
-
-function tokenize(text) {
-  return new Set((String(text).toLowerCase().match(/[a-z0-9]+/g) || []).filter((x) => x.length > 1 && !STOP.has(x)));
-}
-
-function topTerms(text) {
-  const counts = {};
-  for (const raw of text.toLowerCase().match(/[a-z]{4,}/g) || []) if (!STOP.has(raw)) counts[raw] = (counts[raw] || 0) + 1;
-  return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([w]) => w);
-}
-
-export function retrieve(chunks, question, limit = 4) {
-  const questionTerms = tokenize(question);
-  const questionText = String(question).toLowerCase();
-  const isDate = /\bwhen\b|\blaunched\b|\blaunch\b|\bstarted\b|\bbegan\b|\bintroduced\b|\bannounced\b|\bissued\b|\beffective\b|\bcommenced\b|\bdate\b|\byear\b/.test(questionText);
-  const isAmount = /\bhow much\b|\bamount\b|\bbudget\b|\bbenefit\b|\bcost\b|\bprice\b/.test(questionText);
-  const isDeadline = /\bdeadline\b|\bwhen.*close|\blast date\b|\bapply\b|\bsubmit\b|\bdue\b/.test(questionText);
-  const scored = chunks.map((chunk) => {
-    const hay = chunk.text.toLowerCase();
-    const chunkTerms = tokenize(hay);
-    let score = 0;
-    for (const term of questionTerms) {
-      if (chunkTerms.has(term)) score += 3;
-      else if (hay.includes(term)) score += 1;
-    }
-    if (isDate && /launched|launch|issued|started|began|introduced|announced|effective|commenced/i.test(hay)) score += 12;
-    if (isDate && /\b\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+20\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b/.test(hay)) score += 30;
-    else if (isDate && /\b20\d{2}\b/.test(hay)) score += 8;
-    if (isAmount && /INR|₹|crore|lakh|amount|benefit|cost|price/i.test(hay)) score += 8;
-    if (isDeadline && /close|deadline|apply|submit|due|last date|by\b/i.test(hay)) score += 8;
-    if (/\beligible\b|\beligibility\b/.test(questionText) && /eligib|qualification|beneficiar/i.test(hay)) score += 8;
-    const words = hay.split(/\s+/).filter(Boolean).length;
-    if (words < 6 && /\d/.test(hay)) score -= 4;
-    if (/^newly launched scheme\s*[.·•_-]*$/i.test(chunk.text.trim())) score -= 100;
-    return { ...chunk, score };
-  });
-
-  const ranked = scored.sort((a, b) => b.score - a.score || a.index - b.index);
-  if (isDate) {
-    // Always include the strongest date-bearing evidence even when a noisy PDF title
-    // happens to match the question better than the actual sentence containing the date.
-    const dateEvidence = ranked.filter((x) => /\b\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+20\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b|\b20\d{2}\b/i.test(x.text));
-    const merged = [];
-    for (const item of [...dateEvidence, ...ranked]) if (!merged.some((x) => x.id === item.id)) merged.push(item);
-    return merged.slice(0, Math.max(limit, 8));
-  }
-  return ranked.slice(0, limit);
+export function retrieve(chunks, question, limit = 6) {
+  const q = tokenize(question); const raw = String(question).toLowerCase();
+  const intent = /\bwhen\b|\blaunched\b|\bdate\b|\byear\b/.test(raw) ? "date" : /\bhow much\b|\bamount\b|\bbudget\b|\bbenefit\b|\bcost\b/.test(raw) ? "amount" : /\bdeadline\b|\blast date\b|\bclose\b|\bapply\b|\bsubmit\b|\bdue\b/.test(raw) ? "deadline" : /\beligib|qualif|beneficiar|who can/.test(raw) ? "eligibility" : "general";
+  const scored = chunks.map((chunk) => { const hay = chunk.text.toLowerCase(); const terms = tokenize(hay); let score = 0; for (const t of q) if (terms.has(t)) score += 4; else if (hay.includes(t)) score += 1; if (intent === "date" && /launched|launch|started|introduced|announced|issued|effective|commenced/i.test(hay)) score += 18; if (intent === "date" && /\b(?:\d{1,2}\s+)?(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+20\d{2}\b|\b20\d{2}\b/i.test(hay)) score += 25; if (intent === "amount" && /INR|₹|crore|lakh|amount|benefit|budget/i.test(hay)) score += 15; if (intent === "deadline" && /deadline|close|last date|apply|submit|due|by\b/i.test(hay)) score += 15; if (intent === "eligibility" && /eligib|qualification|qualify|beneficiar|who can/i.test(hay)) score += 15; return { ...chunk, score }; }).sort((a,b) => b.score-a.score || a.index-b.index);
+  return scored.filter((x) => x.score > 0).slice(0, limit);
 }
