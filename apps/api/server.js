@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CONFIG } from "../../packages/shared/config.js";
 import { mutateDb, readDb, id, now, logAudit } from "../../packages/database/store.js";
-import { analyzeDocument, chunkDocument, parseUploadedContent, retrieve } from "../../packages/ai/document.js";
+import { analyzeDocument, chunkDocument, parseUploadedContent, retrieve, questionIntent } from "../../packages/ai/document.js";
 import { createProvider, listTemplates } from "../../packages/ai/provider.js";
 import { verifyOutput } from "../../packages/ai/verification.js";
 import { hashPassword, signToken, verifyPassword, verifyToken } from "./auth.js";
@@ -133,9 +133,14 @@ async function chat(req, res, user, documentId) {
   const body = await bodyJson(req);
   const db = await readDb();
   const chunks = db.document_chunks.filter((c) => c.documentId === documentId);
-  const evidence = retrieve(chunks, body.question || "");
-  const answer = await provider.chat({ question: body.question, evidence });
-  await logAudit(user.id, "document.chat", { documentId });
+  const question = String(body.question || "").trim();
+  const intent = questionIntent(question);
+  // Q&A needs broader evidence coverage than the artifact UI. Count/general questions
+  // may depend on information spread across many pages, so search the full document.
+  const evidenceLimit = ["count", "general"].includes(intent) ? Math.max(20, chunks.length) : 8;
+  const evidence = retrieve(chunks, question, evidenceLimit);
+  const answer = await provider.chat({ question, evidence });
+  await logAudit(user.id, "document.chat", { documentId, intent });
   json(res, 200, answer);
 }
 
@@ -244,51 +249,48 @@ async function serveStatic(res, pathname) {
   try {
     const bytes = await readFile(target);
     const type = target.endsWith(".css") ? "text/css" : target.endsWith(".js") ? "text/javascript" : "text/html";
-    res.writeHead(200, { "Content-Type": `${type}; charset=utf-8` });
+    res.writeHead(200, { "content-type": type });
     res.end(bytes);
   } catch {
-    const html = await readFile(path.join(webDir, "index.html"));
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(html);
+    res.writeHead(404);
+    res.end("Not found");
   }
 }
 
 function json(res, status, payload) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
 }
 
 function setSecurityHeaders(res) {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Referrer-Policy", "same-origin");
+  res.setHeader("x-content-type-options", "nosniff");
+  res.setHeader("x-frame-options", "DENY");
+  res.setHeader("referrer-policy", "no-referrer");
 }
 
 function rateLimited(req) {
-  const key = req.socket.remoteAddress || "local";
-  const bucket = rate.get(key) || { count: 0, at: Date.now() };
-  if (Date.now() - bucket.at > 60_000) Object.assign(bucket, { count: 0, at: Date.now() });
-  bucket.count += 1;
-  rate.set(key, bucket);
-  return bucket.count > 240;
-}
-
-function group(items, key) {
-  return items.reduce((acc, item) => {
-    const label = item[key] || "Unknown";
-    acc[label] = (acc[label] || 0) + 1;
-    return acc;
-  }, {});
+  const key = req.socket.remoteAddress || "unknown";
+  const nowMs = Date.now();
+  const entry = rate.get(key) || { count: 0, reset: nowMs + 60_000 };
+  if (nowMs > entry.reset) { entry.count = 0; entry.reset = nowMs + 60_000; }
+  entry.count += 1;
+  rate.set(key, entry);
+  return entry.count > 120;
 }
 
 function overlap(a, b) {
-  const ax = new Set(a.toLowerCase().match(/[a-z0-9]+/g) || []);
-  const bx = new Set(b.toLowerCase().match(/[a-z0-9]+/g) || []);
-  return [...ax].filter((x) => bx.has(x)).length / Math.max(1, ax.size);
+  const A = new Set((a.toLowerCase().match(/[a-z0-9]+/g) || []));
+  const B = new Set((b.toLowerCase().match(/[a-z0-9]+/g) || []));
+  const intersection = [...A].filter((x) => B.has(x)).length;
+  return intersection / Math.max(1, Math.min(A.size, B.size));
 }
 
-function diffRegex(a, b, re) {
-  const left = [...new Set(a.match(re) || [])];
-  const right = [...new Set(b.match(re) || [])];
-  return { fromA: left.filter((x) => !right.includes(x)), fromB: right.filter((x) => !left.includes(x)) };
+function diffRegex(a, b, regex) {
+  const A = [...a.matchAll(regex)].map((m) => m[0]);
+  const B = [...b.matchAll(regex)].map((m) => m[0]);
+  return { before: [...new Set(A)], after: [...new Set(B)].filter((x) => !A.includes(x)) };
+}
+
+function group(items, key) {
+  return items.reduce((acc, item) => { const value = item[key] || "Unknown"; acc[value] = (acc[value] || 0) + 1; return acc; }, {});
 }
