@@ -1,379 +1,53 @@
-const state = {
-  token: localStorage.getItem("transformai_token"),
-  user: null,
-  view: "overview",
-  docs: [],
-  outputs: [],
-  analytics: null,
-  activeDoc: null,
-  chat: []
-};
-
-const outputTypes = ["Citizen Simplifier", "Officer Brief", "Executive Summary", "FAQ Generator", "WhatsApp Generator", "Social Media Generator", "Presentation Generator", "Voice Script", "Press Release", "SMS / Alert", "Infographic Content"];
-const nav = ["Overview", "New Transformation", "Documents", "Transformation History", "Templates", "Saved Outputs", "Analytics", "Settings"];
-
-const $ = (sel) => document.querySelector(sel);
-const app = $("#app");
-
-init();
-
-async function init() {
-  if (!state.token) return renderLanding();
-  try {
-    const me = await api("/api/me");
-    state.user = me.user;
-    await loadData();
-    renderApp();
-  } catch {
-    localStorage.removeItem("transformai_token");
-    state.token = null;
-    renderLanding();
-  }
-}
-
-async function loadData() {
-  const [docs, outputs, analytics] = await Promise.all([api("/api/documents"), api("/api/transformations"), api("/api/analytics")]);
-  state.docs = docs.documents;
-  state.outputs = outputs.outputs;
-  state.analytics = analytics;
-  state.activeDoc ||= state.docs[0];
-}
-
-function renderLanding() {
-  app.innerHTML = `
-    <div class="landing">
-      <header class="topbar">
-        <div class="brand"><span class="seal">T</span> TransformAI</div>
-        <div><button class="ghost" data-login>Login</button> <button class="primary" data-demo>Explore Demo</button></div>
-      </header>
-      <main class="hero">
-        <section>
-          <h1>Transform One Source Into Every Message.</h1>
-          <p>AI-powered content transformation that preserves facts, context, citations, and intent for government and enterprise communication workflows.</p>
-          <div class="hero-actions">
-            <button class="primary" data-demo>Start Transforming</button>
-            <button class="ghost" data-login>Officer Login</button>
-          </div>
-        </section>
-        <section class="workflow-board">
-          <div class="workflow">
-            ${["Upload", "Understand", "Transform", "Verify", "Publish"].map((x, i) => `<div class="step"><b>0${i + 1}</b><strong>${x}</strong><span>${workflowText(x)}</span></div>`).join("")}
-          </div>
-          <div class="feature-grid">
-            ${["Multilingual AI", "Factuality Verification", "Citation Preservation", "Multi-Format Generation", "Document Intelligence", "Source-Grounded AI"].map((x) => `<div class="feature">${x}</div>`).join("")}
-          </div>
-        </section>
-      </main>
-    </div>`;
-  document.querySelectorAll("[data-demo]").forEach((b) => b.onclick = demoLogin);
-  document.querySelectorAll("[data-login]").forEach((b) => b.onclick = renderAuth);
-}
-
-function renderAuth() {
-  app.innerHTML = `
-    <main class="auth">
-      <section class="panel auth-card">
-        <div class="brand"><span class="seal">T</span> TransformAI</div>
-        <h2>Secure officer login</h2>
-        <p class="metric">Demo credentials: officer@transformai.gov / Officer@123</p>
-        <form id="loginForm">
-          <label>Email<input name="email" value="officer@transformai.gov" autocomplete="username"></label><br>
-          <label>Password<input name="password" type="password" value="Officer@123" autocomplete="current-password"></label><br>
-          <button class="primary full" type="submit">Login</button>
-          <button class="ghost full" type="button" data-back>Back</button>
-        </form>
-      </section>
-    </main>`;
-  $("#loginForm").onsubmit = async (e) => {
-    e.preventDefault();
-    const body = Object.fromEntries(new FormData(e.target));
-    const result = await api("/api/auth/login", { method: "POST", body });
-    state.token = result.token;
-    localStorage.setItem("transformai_token", result.token);
-    toast("Login successful");
-    await init();
-  };
-  $("[data-back]").onclick = renderLanding;
-}
-
-async function demoLogin() {
-  const result = await api("/api/auth/login", { method: "POST", body: { email: "officer@transformai.gov", password: "Officer@123" } });
-  state.token = result.token;
-  localStorage.setItem("transformai_token", result.token);
-  await init();
-}
-
-function renderApp() {
-  app.innerHTML = `
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="brand"><span class="seal">T</span> TransformAI</div>
-        <nav class="nav">${nav.map((n) => `<button class="${viewKey(n) === state.view ? "active" : ""}" data-view="${viewKey(n)}">${n}</button>`).join("")}</nav>
-        <div class="user-box">
-          <strong>${state.user.name}</strong><br>${state.user.role}<br>${state.user.email}
-          <br><br><button class="ghost" data-logout>Logout</button>
-        </div>
-      </aside>
-      <main class="main">
-        ${renderView()}
-      </main>
-    </div>`;
-  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => { state.view = b.dataset.view; renderApp(); });
-  $("[data-logout]").onclick = () => { localStorage.removeItem("transformai_token"); location.reload(); };
-  bindView();
-}
-
-function renderView() {
-  if (state.view === "new-transformation") return renderWorkspace();
-  if (state.view === "documents") return renderDocuments();
-  if (state.view === "transformation-history" || state.view === "saved-outputs") return renderOutputs();
-  if (state.view === "analytics") return renderAnalytics();
-  if (state.view === "templates") return renderTemplates();
-  if (state.view === "settings") return renderSettings();
-  return renderOverview();
-}
-
-function renderOverview() {
-  const a = state.analytics;
-  return `
-    <div class="header"><div><h2>Operational Dashboard</h2><p>Source-grounded content transformation overview.</p></div><button class="primary" data-go-transform>New Transformation</button></div>
-    <section class="cards">
-      ${metric("Documents processed", a.documentsProcessed)}
-      ${metric("Transformations generated", a.transformationsGenerated)}
-      ${metric("Languages used", a.languagesUsed)}
-      ${metric("Outputs generated", a.outputsGenerated)}
-      ${metric("Avg factuality", `${a.averageFactualityScore}%`)}
-    </section>
-    <br>
-    <section class="panel">
-      <h3>Recent documents</h3>
-      ${docTable(state.docs.slice(0, 5))}
-    </section>`;
-}
-
-function renderWorkspace() {
-  const d = state.activeDoc;
-  return `
-    <div class="header"><div><h2>Transformation Workspace</h2><p>Upload once, generate many source-grounded deliverables.</p></div><button class="secondary" data-demo-fill>Load Sample Scenario</button></div>
-    <section class="workspace">
-      <div class="panel">
-        <h3>Source Document</h3>
-        <div class="drop" id="drop">Drop PDF, DOCX, TXT, MD or paste text below</div><br>
-        <input type="file" id="fileInput" accept=".txt,.md,.pdf,.docx">
-        <br><br><textarea id="sourceText" placeholder="Paste source content here...">${d?.text || ""}</textarea>
-        <div class="actions"><button class="primary" data-upload>Analyze Document</button></div>
-        ${d ? `<br><h3>Document Preview</h3><div class="doc-preview">${escapeHtml(d.text)}</div>` : ""}
-      </div>
-      <div class="panel">
-        <h3>Transform</h3>
-        <div class="form-grid">
-          ${select("audience", ["Citizen", "Officer", "Executive", "Student", "Media", "General Public"])}
-          ${select("tone", ["Formal", "Simple", "Professional", "Friendly", "Urgent", "Educational"])}
-          ${select("length", ["Short", "Medium", "Detailed"])}
-          ${select("channel", ["WhatsApp", "Email", "Website", "Social Media", "SMS", "Presentation", "Report", "Voice"])}
-          ${select("language", ["English", "Hindi", "Hinglish", "Tamil", "Telugu", "Bengali", "Marathi", "Gujarati", "Kannada", "Malayalam", "Punjabi", "Odia"], "English", "full")}
-        </div>
-        <h3>Output formats</h3>
-        <div class="check-list">${outputTypes.map((x, i) => `<label><input type="checkbox" name="outputType" value="${x}" ${i < 5 ? "checked" : ""}> ${x}</label>`).join("")}</div>
-        <div class="actions"><button class="primary" data-generate ${d ? "" : "disabled"}>Generate Selected Outputs</button></div>
-        ${d ? renderIntelligence(d) : ""}
-      </div>
-      <div class="panel">
-        <div class="tabs"><button class="active">Generated Output</button><button data-chat-tab>Chat</button><button data-compare-tab>Compare</button></div>
-        <div id="rightPane">${renderGenerated()}</div>
-      </div>
-    </section>`;
-}
-
-function renderGenerated() {
-  const visible = state.outputs.filter((o) => !state.activeDoc || o.documentIds.includes(state.activeDoc.id)).slice(0, 4);
-  if (!visible.length) return `<p class="metric">Generated outputs will appear here with factuality, citation coverage, and export controls.</p>`;
-  return visible.map(outputCard).join("");
-}
-
-function outputCard(o) {
-  const unsupported = o.verification?.unsupported || 0;
-  return `
-    <article class="output-card">
-      <strong>${o.outputType}</strong>
-      <div class="output-meta">
-        <span class="badge">${o.language}</span><span class="badge">${o.audience}</span>
-        <span class="badge ${o.factualityScore >= 90 ? "ok" : "warn"}">Factuality ${o.factualityScore}%</span>
-        <span class="badge ok">Citations ${o.citationCoverage}%</span>
-        ${o.demo ? `<span class="badge warn">Demo provider</span>` : ""}
-        ${unsupported ? `<span class="badge danger">${unsupported} unsupported</span>` : ""}
-      </div>
-      <div class="content" contenteditable="true" data-edit="${o.id}">${escapeHtml(o.content)}</div>
-      <details><summary>Why did AI generate this?</summary>${(o.citationMap || []).slice(0, 5).map((c) => `<p class="metric">${c.marker} Page ${c.page}, ${c.section}: ${escapeHtml(c.source)}</p>`).join("")}</details>
-      <div class="actions"><button data-copy="${o.id}">Copy</button><button data-save-version="${o.id}">Save Version</button><button data-export="${o.id}" data-format="md">Export MD</button><button data-export="${o.id}" data-format="json">Export JSON</button><button data-verify="${o.id}">Verify</button></div>
-    </article>`;
-}
-
-function renderIntelligence(d) {
-  const i = d.intelligence || {};
-  return `<br><h3>Source Intelligence</h3>
-    <div class="chips">${(i.topics || []).map((x) => `<span class="chip">${x}</span>`).join("")}</div><br>
-    <table class="table">
-      <tr><td>Words</td><td>${i.wordCount}</td></tr><tr><td>Pages</td><td>${i.pages}</td></tr>
-      <tr><td>Language</td><td>${i.detectedLanguage}</td></tr><tr><td>Claims</td><td>${i.claimCount}</td></tr>
-      <tr><td>Entities</td><td>${i.entityCount}</td></tr><tr><td>Citations</td><td>${i.citationCount}</td></tr>
-    </table>
-    <h3>Dates and numbers</h3><div class="chips">${[...(i.dates || []), ...(i.numbers || [])].map((x) => `<span class="chip">${x}</span>`).join("")}</div>`;
-}
-
-function renderDocuments() {
-  return `<div class="header"><div><h2>Documents</h2><p>Analyzed source library with document-level intelligence.</p></div></div><section class="panel">${docTable(state.docs)}</section>`;
-}
-
-function renderOutputs() {
-  return `<div class="header"><div><h2>Transformation History</h2><p>Versioned, verified outputs generated from source documents.</p></div></div><section class="panel">${state.outputs.map(outputCard).join("")}</section>`;
-}
-
-function renderAnalytics() {
-  const a = state.analytics;
-  return `<div class="header"><div><h2>Analytics</h2><p>Usage, factuality, languages, and department insights.</p></div></div>
-    <section class="cards">${metric("Avg factuality", `${a.averageFactualityScore}%`)}${metric("Avg citation coverage", `${a.averageCitationCoverage}%`)}${metric("Outputs", a.outputsGenerated)}${metric("Documents", a.documentsProcessed)}${metric("Languages", a.languagesUsed)}</section><br>
-    <div class="workspace" style="grid-template-columns:1fr 1fr 1fr">
-      <section class="panel"><h3>Transformation types</h3>${chart(a.byType)}</section>
-      <section class="panel"><h3>Languages</h3>${chart(a.byLanguage)}</section>
-      <section class="panel"><h3>Departments</h3>${chart(a.byDepartment)}</section>
-    </div>`;
-}
-
-function renderTemplates() {
-  return `<div class="header"><div><h2>Templates</h2><p>Reusable AI content modes for public communication.</p></div></div><section class="cards">${outputTypes.map((x) => `<div class="card"><strong>${x}</strong><p class="metric">${workflowText(x)}</p></div>`).join("")}</section>`;
-}
-
-function renderSettings() {
-  return `<div class="header"><div><h2>Settings</h2><p>Provider abstraction and security posture.</p></div></div><section class="panel"><table class="table">
-    <tr><th>Capability</th><th>Status</th></tr>
-    <tr><td>AI provider</td><td>Demo fallback active unless LLM_PROVIDER and API keys are configured</td></tr>
-    <tr><td>Authentication</td><td>JWT-style signed token, hashed passwords, protected APIs</td></tr>
-    <tr><td>Storage</td><td>Local JSON prototype with PostgreSQL-ready data model names</td></tr>
-    <tr><td>Security</td><td>Rate limiting, file size limits, no frontend API keys, audit logs</td></tr>
-  </table></section>`;
-}
-
-function bindView() {
-  const go = $("[data-go-transform]");
-  if (go) go.onclick = () => { state.view = "new-transformation"; renderApp(); };
-  const demo = $("[data-demo-fill]");
-  if (demo) demo.onclick = () => { state.activeDoc = state.docs[0]; renderApp(); };
-  const upload = $("[data-upload]");
-  if (upload) upload.onclick = uploadDoc;
-  const gen = $("[data-generate]");
-  if (gen) gen.onclick = generate;
-  const chatTab = $("[data-chat-tab]");
-  if (chatTab) chatTab.onclick = renderChatPane;
-  const compareTab = $("[data-compare-tab]");
-  if (compareTab) compareTab.onclick = renderComparePane;
-  document.querySelectorAll("[data-export]").forEach((b) => b.onclick = () => exportOutput(b.dataset.export, b.dataset.format));
-  document.querySelectorAll("[data-copy]").forEach((b) => b.onclick = () => copyOutput(b.dataset.copy));
-  document.querySelectorAll("[data-verify]").forEach((b) => b.onclick = () => verify(b.dataset.verify));
-  document.querySelectorAll("[data-save-version]").forEach((b) => b.onclick = () => saveVersion(b.dataset.saveVersion));
-}
-
-async function uploadDoc() {
-  const file = $("#fileInput").files[0];
-  let content = $("#sourceText").value;
-  let name = "Pasted content.txt";
-  let type = "text/plain";
-  if (file) {
-    name = file.name; type = file.type || "application/octet-stream";
-    content = await file.text().catch(() => content);
-  }
-  if (!content && !file) return toast("Paste content or choose a document");
-  const result = await api("/api/documents/upload", { method: "POST", body: { name, type, content, department: "Demo Department" } });
-  state.activeDoc = result.document;
-  await loadData();
-  toast("Document successfully analyzed");
-  renderApp();
-}
-
-async function generate() {
-  const body = {
-    documentIds: [state.activeDoc.id],
-    outputTypes: [...document.querySelectorAll("[name=outputType]:checked")].map((x) => x.value),
-    audience: $("#audience").value, tone: $("#tone").value, length: $("#length").value, channel: $("#channel").value, language: $("#language").value
-  };
-  if (!body.outputTypes.length) return toast("Select at least one output format");
-  const btn = $("[data-generate]");
-  btn.disabled = true; btn.textContent = "Generating...";
-  const result = await api("/api/transformations", { method: "POST", body });
-  state.outputs = [...result.outputs, ...state.outputs];
-  await loadData();
-  toast(`${result.outputs.length} outputs generated and verified`);
-  renderApp();
-}
-
-async function renderChatPane() {
-  $("#rightPane").innerHTML = `<h3>Chat with Document</h3><div class="chat-log" id="chatLog">${state.chat.map((m) => `<div class="msg ${m.role}">${escapeHtml(m.text)}</div>`).join("")}</div><br><input id="chatQuestion" placeholder="Ask: What is the eligibility criteria?"><div class="actions"><button class="primary" data-ask>Ask</button></div>`;
-  $("[data-ask]").onclick = async () => {
-    const q = $("#chatQuestion").value;
-    state.chat.push({ role: "user", text: q });
-    const result = await api(`/api/documents/${state.activeDoc.id}/chat`, { method: "POST", body: { question: q } });
-    state.chat.push({ role: "ai", text: `${result.answer}\n${(result.citations || []).map((c) => `${c.marker} Page ${c.page}, ${c.section}`).join("\n")}` });
-    renderChatPane();
-  };
-}
-
-async function renderComparePane() {
-  const options = state.docs.map((d) => `<option value="${d.id}">${d.title}</option>`).join("");
-  $("#rightPane").innerHTML = `<h3>Compare Documents</h3>${select("docA", [], "", "", options)}${select("docB", [], "", "", options)}<div class="actions"><button class="primary" data-compare>Compare</button></div><div id="compareResult"></div>`;
-  $("[data-compare]").onclick = async () => {
-    const result = await api("/api/documents/compare", { method: "POST", body: { documentIds: [$("#docA").value, $("#docB").value] } });
-    $("#compareResult").innerHTML = `<h3>Added clauses</h3><div class="content">${escapeHtml(result.addedClauses.join("\n"))}</div><h3>Removed clauses</h3><div class="content">${escapeHtml(result.removedClauses.join("\n"))}</div><h3>Changed dates</h3><pre>${escapeHtml(JSON.stringify(result.changedDates, null, 2))}</pre>`;
-  };
-}
-
-async function exportOutput(id, format) {
-  const result = await api(`/api/exports/${id}`, { method: "POST", body: { format } });
-  toast(`Exported to ${result.file}`);
-}
-
-async function copyOutput(id) {
-  const out = state.outputs.find((o) => o.id === id);
-  await navigator.clipboard.writeText(out.content);
-  toast("Copied output");
-}
-
-async function verify(id) {
-  const result = await api(`/api/transformations/${id}/verify`, { method: "POST", body: {} });
-  toast(`Factuality ${result.factualityScore}%, unsupported ${result.unsupported}`);
-}
-
-async function saveVersion(id) {
-  const el = document.querySelector(`[data-edit="${id}"]`);
-  await api(`/api/transformations/${id}/version`, { method: "POST", body: { content: el.innerText } });
-  toast("Version saved");
-}
-
-async function api(path, options = {}) {
-  const res = await fetch(path, {
-    method: options.method || "GET",
-    headers: { "Content-Type": "application/json", ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}) },
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Request failed");
-  return data;
-}
-
-function metric(label, value) { return `<div class="card"><div class="metric">${label}</div><div class="value">${value}</div></div>`; }
-function docTable(docs) { return `<table class="table"><tr><th>Document</th><th>Department</th><th>Claims</th><th>Status</th></tr>${docs.map((d) => `<tr><td><button class="ghost" onclick="window.pickDoc('${d.id}')">${d.title}</button></td><td>${d.department}</td><td>${d.intelligence?.claimCount || 0}</td><td><span class="badge ok">${d.status}</span></td></tr>`).join("")}</table>`; }
-window.pickDoc = (id) => { state.activeDoc = state.docs.find((d) => d.id === id); state.view = "new-transformation"; renderApp(); };
-function chart(obj) { const max = Math.max(1, ...Object.values(obj || {})); return `<div class="chart">${Object.entries(obj || {}).map(([k, v]) => `<div class="bar"><span>${k}</span><span style="width:${(v / max) * 100}%"></span><b>${v}</b></div>`).join("")}</div>`; }
-function select(id, values, selected = values[0], klass = "", override = "") { return `<label class="${klass}">${title(id)}<select id="${id}">${override || values.map((x) => `<option ${x === selected ? "selected" : ""}>${x}</option>`).join("")}</select></label>`; }
-function title(s) { return s.replace(/([A-Z])/g, " $1").replace(/^./, (x) => x.toUpperCase()); }
-function viewKey(s) { return s.toLowerCase().replace(/\s+/g, "-"); }
-function escapeHtml(s = "") { return String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
-function toast(text) { const t = document.createElement("div"); t.className = "toast"; t.textContent = text; $("#toast").append(t); setTimeout(() => t.remove(), 4200); }
-function workflowText(x) {
-  return {
-    Upload: "Ingest PDF, DOCX, TXT, Markdown, or pasted text.",
-    Understand: "Extract claims, entities, dates, numbers, and topics.",
-    Transform: "Generate for many audiences, tones, languages, and channels.",
-    Verify: "Check generated claims against source evidence.",
-    Publish: "Copy, version, export, and share approved output."
-  }[x] || "Reusable source-grounded transformation mode.";
-}
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)],app=$("#app");
+const OUTPUTS=["Citizen Simplifier","Officer Brief","Executive Summary","FAQ Generator","WhatsApp Generator","Social Media Generator","Presentation Generator","Voice Script","Press Release","SMS / Alert","Infographic Content","Detailed Report","Key Facts / Statistics","Action Checklist"];
+const LANGUAGES=["English","Hindi","Hinglish","Tamil","Telugu","Bengali","Marathi","Gujarati","Kannada","Malayalam","Punjabi","Odia"];
+const NAV=[["dashboard","Command Center"],["transform","MORPH Studio"],["documents","Source Library"],["history","Output Vault"],["features","Capabilities"],["analytics","Analytics"],["audit","Audit & Provenance"],["settings","System"]];
+const CAPABILITIES=[["Document Ingestion","PDF, DOCX, TXT, Markdown and pasted source text."],["Document Intelligence","Claims, entities, dates, numbers, topics and review signals."],["Immune System","Scan source text for prompt-injection-style instructions."],["MORPH Studio","Fourteen source-grounded output formats with audience, tone, channel and language controls."],["Glass Box Traceability","Inspect source evidence attached to an artifact."],["Confidence & Ambiguity","Expose verification scores instead of silently guessing."],["Clearance / Redaction","Create a deterministic sanitized working copy."],["Bias Neutralizer","Create an objective working copy while retaining attribution."],["Ask MORPH","Ask questions against retrieved source chunks."],["Conflict Comparison","Compare two sources for changed information."],["Review & Approval","Approve or request revision before export."],["Versioning & Export","Save versions and export Markdown or JSON with provenance."]];
+const state={token:localStorage.getItem("morph_token"),user:null,view:"dashboard",docs:[],outputs:[],analytics:{},activeDoc:null,chat:[],audit:JSON.parse(localStorage.getItem("morph_audit")||"[]"),review:JSON.parse(localStorage.getItem("morph_review")||"{}"),decoy:"",pendingFile:null};
+boot();
+async function api(path,o={}){const r=await fetch(path,{method:o.method||"GET",headers:{"Content-Type":"application/json",...(state.token?{Authorization:`Bearer ${state.token}`}:{})},body:o.body===undefined?undefined:JSON.stringify(o.body)});let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.error||`Request failed (${r.status})`);return d}
+async function boot(){if(!state.token)return landing();try{state.user=(await api("/api/me")).user;await refresh();render()}catch(e){localStorage.removeItem("morph_token");state.token=null;landing()}}
+async function refresh(){const[d,o,a]=await Promise.all([api("/api/documents"),api("/api/transformations"),api("/api/analytics")]);state.docs=d.documents||[];state.outputs=o.outputs||[];state.analytics=a||{};if(state.activeDoc&&!state.docs.some(x=>x.id===state.activeDoc.id))state.activeDoc=null}
+function esc(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
+function persist(){localStorage.setItem("morph_audit",JSON.stringify(state.audit.slice(-300)));localStorage.setItem("morph_review",JSON.stringify(state.review))}
+function logEvent(action,detail=""){state.audit.push({action,detail,createdAt:new Date().toISOString()});persist()}
+function toast(message){const e=$("#toast");if(!e)return;e.textContent=message;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),3000)}
+function landing(){app.innerHTML=`<div class="landing"><header class="topbar"><div class="brand"><span class="seal">M</span><div><b>MORPH</b><small>MULTIFORMAT OUTPUT & REPRESENTATION PROCESSING HUB</small></div></div><div class="top-actions"><button class="ghost" data-action="register">Create Account</button><button class="primary" data-action="login">Officer Login</button></div></header><main class="landing-main"><section class="hero-copy"><div class="eyebrow">SOURCE-GROUNDED COMMUNICATION PLATFORM</div><h1>MORPH</h1><h2>Multiformat Output &amp; Representation Processing Hub</h2><p>Transform trusted government documents into verified, audience-specific communication while preserving facts, citations, deadlines and source context.</p><div class="hero-actions"><button class="primary large" data-action="login">Enter Command Center →</button><button class="ghost large" data-action="register">Create Workspace</button></div><div class="trust-row"><span>● Source grounded</span><span>● Traceable</span><span>● Verified</span><span>● Human controlled</span></div></section><section class="landing-console"><div class="console-top"><span>MORPH / OPERATIONAL CORE</span><span class="online">● SYSTEM READY</span></div><h3>INGEST → UNDERSTAND → MORPH → VERIFY → REVIEW</h3><p>One evidence model powers the complete transformation workflow.</p><div class="pipeline-preview">${["Ingest","Understand","Morph","Verify","Publish"].map((x,i)=>`<div><span>0${i+1}</span><b>${x}</b><small>${["PDF · DOCX · TXT · MD","Claims · entities · dates","14 output formats","Factuality · citations","Review · version · export"][i]}</small></div>`).join("")}</div><div class="cap-strip">${CAPABILITIES.map(c=>`<span>${esc(c[0])}</span>`).join("")}</div></section></main></div>`;bindGlobal()}
+function authPage(register=false){app.innerHTML=`<main class="auth-page"><section class="panel auth-card"><div class="brand"><span class="seal">M</span><b>MORPH</b></div><div class="eyebrow">SECURE OPERATOR ACCESS</div><h1>${register?"Create operator account":"Officer Login"}</h1><p class="muted">${register?"Create a workspace account for source-grounded transformation.":"Authenticate to enter the MORPH command center."}</p>${!register?`<div class="demo-credentials"><b>Demo Officer</b><span>Email: <code>officer@transformai.gov</code></span><span>Password: <code>Officer@123</code></span><button class="ghost" type="button" data-action="fill-demo">Use demo credentials</button></div>`:""}<form id="authForm">${register?'<label>Name<input name="name" maxlength="100" required></label>':""}<label>Email<input name="email" type="email" required></label><label>Password<input name="password" type="password" minlength="8" required></label><button class="primary full large" type="submit">${register?"Create Account":"Authenticate"} →</button><button class="ghost full" type="button" data-action="back">Back</button></form></section></main>`;bindGlobal()}
+function render(){app.innerHTML=`<div class="app-shell"><aside class="sidebar"><div class="brand sidebar-brand"><span class="seal">M</span><div><b>MORPH</b><small>INTELLIGENCE OS</small></div></div><div class="secure-badge"><span class="pulse"></span> SECURE WORKSPACE</div><nav class="nav">${NAV.map(([k,l])=>`<button data-nav="${k}" class="${state.view===k?"active":""}"><span>◆</span>${l}</button>`).join("")}</nav><div class="sidebar-source"><span>ACTIVE SOURCE</span><b>${esc(state.activeDoc?.title||"None loaded")}</b><small>${state.activeDoc?`${esc((state.activeDoc.fileType||"DOC").toUpperCase())} · ${state.activeDoc.pages||1} page(s)`:"New transformation"}</small></div><div class="user-box"><b>${esc(state.user?.name||"Operator")}</b><small>${esc(state.user?.role||"USER")} · ${esc(state.user?.email||"")}</small><button class="ghost full" data-action="logout">Sign out</button></div></aside><main class="main"><header class="main-top"><div><span class="crumb">MORPH / ${esc(pageTitle())}</span><h1>${esc(pageTitle())}</h1><p>${esc(pageSubtitle())}</p></div><div class="top-actions"><span class="session-badge">● VERIFIED SESSION</span><button class="primary" data-action="new">＋ New Transformation</button></div></header>${view()}</main></div>`;bindGlobal()}
+function pageTitle(){return({dashboard:"Command Center",transform:"MORPH Studio",documents:"Source Library",history:"Output Vault",features:"Capabilities",analytics:"Operational Analytics",audit:"Audit & Provenance",settings:"System & Security"})[state.view]||"Command Center"}
+function pageSubtitle(){return({dashboard:"Live operations from ingestion through verification and review.",transform:"Build, inspect and approve source-grounded communication artifacts.",documents:"Every analyzed source and its evidence profile.",history:"Versioned artifacts with factuality, citations and review state.",features:"Tier 1 capabilities plus safe deterministic tools available in this deployment.",analytics:"Usage, quality, language and source/output distribution.",audit:"Local operator events plus artifact provenance and verification history.",settings:"Runtime posture, authentication and safe deployment configuration."})[state.view]||""}
+function view(){return({dashboard,transform:studio,documents,history:vault,features,analytics:analyticsView,audit:auditView,settings:settingsView}[state.view]||dashboard)()}
+function metric(label,value,tag){return `<div class="metric-card"><span>${esc(tag)}</span><small>${esc(label)}</small><b>${esc(value)}</b></div>`}
+function empty(title,text){return `<div class="empty"><div class="empty-mark">◇</div><b>${esc(title)}</b><small>${esc(text||"")}</small></div>`}
+function dashboard(){const a=state.analytics||{};return `<section class="metric-grid">${metric("Sources processed",a.documentsProcessed||0,"SOURCE")}${metric("Transformations",a.transformationsGenerated||0,"OPS")}${metric("Artifacts",a.outputsGenerated||0,"OUTPUT")}${metric("Languages",a.languagesUsed||0,"I18N")}${metric("Avg factuality",`${a.averageFactualityScore||0}%`,"VERIFY")}</section><section class="dashboard-grid"><div class="panel"><div class="section-head"><div><div class="eyebrow">CORE PIPELINE</div><h2>Source → intelligence → action</h2></div><button class="ghost" data-action="new">Open MORPH Studio</button></div><div class="flow">${[["01","INGEST","PDF · DOCX · TXT · MD"],["02","UNDERSTAND","CLAIMS · ENTITIES · DATES"],["03","MORPH","14 OUTPUT FORMATS"],["04","VERIFY","FACTUALITY · CITATIONS"],["05","REVIEW","APPROVE · EXPORT"]].map(x=>`<div class="flow-step"><span>${x[0]}</span><b>${x[1]}</b><small>${x[2]}</small></div>`).join("")}</div></div><div class="panel"><div class="section-head"><div><div class="eyebrow">GUARDRAILS</div><h2>Operational status</h2></div><span class="status-pill ok">READY</span></div>${[["Immune pre-flight","Scan source text before ingest"],["Traceability","Citation map per artifact"],["Verification","Unsupported content surfaced"],["Review","Approval state before export"],["Provenance","Fingerprint on exports"]].map(x=>`<div class="status-row"><span class="check">✓</span><div><b>${x[0]}</b><small>${x[1]}</small></div><span class="status-pill ok">ON</span></div>`).join("")}</div></section><section class="panel"><div class="section-head"><div><div class="eyebrow">RECENT SOURCES</div><h2>Source library</h2></div><button class="ghost" data-nav="documents">View all →</button></div>${docTable(state.docs.slice(0,6))}</section>`}
+function studio(){const d=state.activeDoc;return `<section class="studio-grid"><section class="panel source-panel"><div class="section-head"><div><div class="eyebrow">01 / INGEST</div><h2>Trusted source</h2></div><span class="status-pill ${d?"ok":""}">${d?"ANALYZED":"WAITING"}</span></div><div class="drop" id="drop"><div class="drop-icon">↑</div><b>Drop a document here</b><small>PDF · DOCX · TXT · Markdown</small><span class="drop-hint">or click to browse</span></div><input id="fileInput" type="file" accept=".pdf,.docx,.txt,.md,.markdown"><textarea id="sourceText" placeholder="Paste trusted source material here…">${esc(d?.text||"")}</textarea><div class="row"><input id="department" placeholder="Department" value="${esc(d?.department||"General")}"><button class="primary" data-action="analyze">${d?"Re-analyze":"Analyze Source"} →</button></div>${d?sourceSummary(d):'<div class="helper">Select a file or paste source material, then analyze it.</div>'}<div class="special-tools"><div class="tool-title">SOURCE SAFETY & DERIVED VIEWS</div><button data-action="immune">Immune Scan</button><button data-action="redact">Clearance Redaction</button><button data-action="bias">Bias Neutralizer</button><button data-action="decoy">Synthetic Decoy</button></div>${state.decoy?`<div class="decoy-box"><span class="status-pill warn">SANDBOX / SYNTHETIC ONLY</span><h3>Honey-Pot Decoy Preview</h3><pre>${esc(state.decoy)}</pre><button class="ghost" data-action="copy-decoy">Copy decoy</button></div>`:""}</section><section class="panel controls-panel"><div class="section-head"><div><div class="eyebrow">02 / MORPH</div><h2>Transformation controls</h2></div><span class="mode-chip">SOURCE GROUNDED</span></div><div class="form-grid">${select("audience",["Citizen","Officer","Executive","Student","Media","General Public"],"Citizen")}${select("tone",["Formal","Simple","Professional","Friendly","Urgent","Educational"],"Professional")}${select("length",["Short","Medium","Detailed"],"Medium")}${select("channel",["Website","WhatsApp","Email","Social Media","SMS","Presentation","Report","Voice"],"Website")}${select("language",LANGUAGES,"English","full")}</div><div class="control-title">OUTPUT ARTIFACTS <button class="text-link" data-action="toggle-outputs">Toggle all</button></div><div class="output-picker">${OUTPUTS.map((x,i)=>`<label class="output-option"><input type="checkbox" name="outputType" value="${esc(x)}" ${i<5?"checked":""}><span>${esc(x)}</span></label>`).join("")}</div><button class="primary large full" data-action="generate" ${d?"":"disabled"}>Generate & Verify Artifacts →</button>${d?intelligence(d):'<div class="helper">Analyze a source to unlock generation.</div>'}</section><section class="panel result-panel"><div class="result-tabs"><button class="active" data-tab="outputs">Outputs</button><button data-tab="chat">Ask MORPH</button><button data-tab="compare">Conflicts</button></div><div id="rightPane">${generated()}</div></section></section>`}
+function sourceSummary(d){const i=d.intelligence||{};return `<div class="source-summary"><div class="eyebrow">ACTIVE SOURCE</div><b>${esc(d.title)}</b><small>${esc((d.fileType||"TEXT").toUpperCase())} · ${i.wordCount||0} words · ${i.pages||d.pages||1} page(s)</small><div class="mini-stats"><span><b>${i.claimCount||0}</b> claims</span><span><b>${i.entityCount||0}</b> entities</span><span><b>${i.citationCount||0}</b> citations</span></div></div>`}
+function intelligence(d){const i=d.intelligence||{};return `<div class="intel"><div class="control-title">SOURCE INTELLIGENCE</div><div class="intel-grid"><div><span>WORDS</span><b>${i.wordCount||0}</b></div><div><span>CLAIMS</span><b>${i.claimCount||0}</b></div><div><span>ENTITIES</span><b>${i.entityCount||0}</b></div><div><span>PAGES</span><b>${i.pages||d.pages||1}</b></div></div><div class="chips">${(i.topics||[]).map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div>${(i.risks||[]).length?`<div class="risk-box"><b>REVIEW SIGNALS</b>${i.risks.map(x=>`<span>${esc(x)}</span>`).join("")}</div>`:""}</div>`}
+function select(name,items,value,cls=""){return `<label class="${cls}">${esc(name.toUpperCase())}<select id="${esc(name)}">${items.map(x=>`<option ${x===value?"selected":""}>${esc(x)}</option>`).join("")}</select></label>`}
+function generated(){if(!state.outputs.length)return empty("No artifacts yet","Generate verified artifacts from the active source.");return state.outputs.slice(0,8).map(outputCard).join("")}
+function outputCard(o){const review=state.review[o.id]||"Pending";return `<article class="output-card"><div class="output-head"><div><div class="eyebrow">ARTIFACT / ${esc(o.outputType)}</div><h3>${esc(o.title)}</h3></div><span class="score">${esc(o.factualityScore??0)}% FACTUALITY</span></div><div class="output-meta"><span>${esc(o.language)}</span><span>${esc(o.channel)}</span><span>v${esc(o.version||1)}</span><span>${esc(review)}</span></div><textarea class="content-editor" data-output="${esc(o.id)}">${esc(o.content)}</textarea><div class="trace"><b>Glass Box Traceability</b><span>${citationText(o)}</span></div><div class="card-actions"><button data-action="save" data-id="${esc(o.id)}">Save Version</button><button data-action="reverify" data-id="${esc(o.id)}">Re-verify</button><button data-action="export-md" data-id="${esc(o.id)}">Export MD</button><button data-action="export-json" data-id="${esc(o.id)}">Export JSON</button><button data-action="approve" data-id="${esc(o.id)}">${review==="Approved"?"Approved ✓":"Approve"}</button><button data-action="revise" data-id="${esc(o.id)}">Request Revision</button></div></article>`}
+function citationText(o){const map=o.citationMap||[];if(!map.length)return "Source-grounded output; verification completed against source facts.";return map.slice(0,6).map(c=>`[${c.citationId||c.id||"C"}] ${c.page?`page ${c.page}`:"source"}${c.section?` · ${c.section}`:""}`).join(" · ")}
+function docTable(docs){if(!docs.length)return empty("No sources","Upload or paste a source in MORPH Studio.");return `<div class="table-wrap"><table class="table"><thead><tr><th>SOURCE</th><th>DEPARTMENT</th><th>STATUS</th><th></th></tr></thead><tbody>${docs.map(d=>`<tr><td><b>${esc(d.title)}</b><small>${esc((d.fileType||"TEXT").toUpperCase())} · ${d.pages||1} page(s)</small></td><td>${esc(d.department||"General")}</td><td><span class="status-pill ok">${esc(d.status||"Analyzed")}</span></td><td><button class="link-btn" data-action="open-doc" data-id="${esc(d.id)}">Open</button></td></tr>`).join("")}</tbody></table></div>`}
+function documents(){return `<section class="panel"><div class="section-head"><div><div class="eyebrow">SOURCE LIBRARY</div><h2>Analyzed sources</h2></div><button class="primary" data-action="new">＋ New Transformation</button></div>${docTable(state.docs)}</section>`}
+function vault(){if(!state.outputs.length)return `<section class="panel">${empty("Output Vault is empty","Generate an artifact to create a versioned, verifiable output.")}</section>`;return `<section class="panel"><div class="section-head"><div><div class="eyebrow">OUTPUT VAULT</div><h2>Versioned artifacts</h2></div><span class="status-pill ok">${state.outputs.length} ARTIFACTS</span></div>${state.outputs.map(o=>`<div class="vault-row"><div><b>${esc(o.title)}</b><small>${esc(o.outputType)} · v${o.version||1} · ${esc(o.createdAt)}</small></div><span>${o.factualityScore||0}% factuality</span><button class="link-btn" data-action="inspect-output" data-id="${esc(o.id)}">Inspect</button></div>`).join("")}</section>`}
+function features(){return `<section class="feature-grid">${CAPABILITIES.map(c=>`<article class="panel feature"><div class="eyebrow">CAPABILITY</div><h2>${esc(c[0])}</h2><p>${esc(c[1])}</p><span class="status-pill ok">AVAILABLE</span></article>`).join("")}</section>`}
+function analyticsView(){const a=state.analytics||{};return `<section class="metric-grid">${metric("Sources processed",a.documentsProcessed||0,"SOURCE")}${metric("Transformations",a.transformationsGenerated||0,"OPS")}${metric("Artifacts",a.outputsGenerated||0,"OUTPUT")}${metric("Citation coverage",`${a.averageCitationCoverage||0}%`,"TRACE")}${metric("Avg factuality",`${a.averageFactualityScore||0}%`,"VERIFY")}</section><section class="panel"><div class="section-head"><div><div class="eyebrow">DISTRIBUTION</div><h2>Operational analytics</h2></div></div><div class="distribution"><div><h3>By output type</h3>${bars(a.byType)}</div><div><h3>By language</h3>${bars(a.byLanguage)}</div><div><h3>By department</h3>${bars(a.byDepartment)}</div></div></section>`}
+function bars(obj={}){const entries=Object.entries(obj||{});if(!entries.length)return empty("No data","Generate artifacts to populate analytics.");const max=Math.max(...entries.map(([,v])=>Number(v)||0),1);return entries.slice(0,10).map(([k,v])=>`<div class="bar-row"><span>${esc(k)}</span><div><i style="width:${Math.max(4,(Number(v)||0)/max*100)}%"></i></div><b>${esc(v)}</b></div>`).join("")}
+function auditView(){const rows=[...state.audit].reverse();return `<section class="panel"><div class="section-head"><div><div class="eyebrow">AUDIT TRAIL</div><h2>Operator activity</h2></div><button class="ghost" data-action="clear-audit">Clear local events</button></div>${rows.length?`<div class="audit-list">${rows.map(x=>`<div class="audit-row"><span>${esc(new Date(x.createdAt).toLocaleString())}</span><b>${esc(x.action)}</b><small>${esc(typeof x.detail==="string"?x.detail:JSON.stringify(x.detail||{}))}</small></div>`).join("")}</div>`:empty("No local events yet","Actions performed in this browser will appear here.")}<div class="provenance"><div class="eyebrow">ARTIFACT PROVENANCE</div><h2>Traceable outputs</h2>${state.outputs.length?state.outputs.map(o=>`<div class="prov-row"><b>${esc(o.title)}</b><span>v${o.version||1} · ${o.factualityScore||0}% factuality · ${o.citationCoverage||0}% citation coverage</span><code>${fingerprint(o)}</code></div>`).join(""):empty("No artifacts","Generate an output to see provenance fingerprints.")}</div></section>`}
+function settingsView(){return `<section class="settings-grid"><div class="panel"><div class="eyebrow">RUNTIME</div><h2>Deployment posture</h2><div class="setting-row"><span>API</span><b>/api/*</b></div><div class="setting-row"><span>Session</span><b>${state.user?"Authenticated":"Signed out"}</b></div><div class="setting-row"><span>Storage</span><b>Server database + browser audit cache</b></div><button class="ghost" data-action="health">Check server health</button></div><div class="panel"><div class="eyebrow">DEMO ACCESS</div><h2>Demo Officer</h2><p class="muted">Use the seeded officer account for presentations and local demonstrations.</p><div class="credential-box"><b>officer@transformai.gov</b><code>Officer@123</code></div></div></section>`}
+function fingerprint(o){let s=`${o.id}|${o.version||1}|${o.title}|${o.content}`;let h=0;for(let i=0;i<s.length;i++)h=((h<<5)-h+s.charCodeAt(i))|0;return `MORPH-${Math.abs(h).toString(16).padStart(8,"0").toUpperCase()}`}
+async function fileToBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>{const result=String(reader.result||"");resolve(result.split(",")[1]||result)};reader.onerror=()=>reject(new Error("Could not read the selected file."));reader.readAsDataURL(file)})}
+async function analyze(){const btn=$("[data-action='analyze']"),file=$("#fileInput")?.files?.[0]||state.pendingFile,raw=$("#sourceText")?.value.trim()||"";if(!file&&!raw){toast("Select a document or paste source text first.");return}if(btn){btn.disabled=true;btn.textContent="Analyzing…"}try{let payload={name:file?.name||"Pasted source",type:file?.type||"text/plain",department:$("#department")?.value.trim()||"General",encoding:"text",content:raw};if(file){payload.encoding="base64";payload.content=await fileToBase64(file)}const result=await api("/api/documents/upload",{method:"POST",body:payload});state.activeDoc=result.document;state.pendingFile=null;logEvent("document.analyze",{documentId:result.document.id,name:result.document.name});await refresh();state.view="transform";render();toast("Source analyzed successfully.")}catch(e){toast(e.message)}finally{if(btn){btn.disabled=false;btn.textContent="Analyze Source →"}}}
+async function generate(){const d=state.activeDoc;if(!d){toast("Analyze a source first.");return}const types=$$("input[name='outputType']:checked").map(x=>x.value);if(!types.length){toast("Select at least one output artifact.");return}const btn=$("[data-action='generate']");if(btn){btn.disabled=true;btn.textContent="Generating & verifying…"}try{const r=await api("/api/transformations",{method:"POST",body:{documentId:d.id,outputTypes:types,audience:$("#audience")?.value,tone:$("#tone")?.value,length:$("#length")?.value,channel:$("#channel")?.value,language:$("#language")?.value}});state.outputs=[...(r.outputs||[]),...state.outputs.filter(x=>!(r.outputs||[]).some(y=>y.id===x.id))];logEvent("transformation.generate",{documentId:d.id,count:(r.outputs||[]).length});render();toast(`${(r.outputs||[]).length} artifact(s) generated and verified.`)}catch(e){toast(e.message)}finally{if(btn){btn.disabled=false;btn.textContent="Generate & Verify Artifacts →"}}}
+async function ask(){const q=$("#question")?.value.trim();if(!q||!state.activeDoc)return;const box=$("#chatLog");box.innerHTML+=`<div class="msg user">${esc(q)}</div>`;$("#question").value="";try{const r=await api(`/api/documents/${state.activeDoc.id}/chat`,{method:"POST",body:{question:q}});box.innerHTML+=`<div class="msg ai">${esc(r.answer||r.response||r.text||"No answer returned.")}<small>${esc((r.citations||[]).map(c=>`page ${c.page||"?"}${c.section?` · ${c.section}`:""}`).join(" · "))}</small></div>`;logEvent("document.chat",{documentId:state.activeDoc.id})}catch(e){toast(e.message)}}
+async function compare(){const ids=$$("#compareA,#compareB").map(x=>x.value);if(ids.length!==2||!ids[0]||!ids[1]||ids[0]===ids[1]){toast("Choose two different sources.");return}try{const r=await api("/api/documents/compare",{method:"POST",body:{documentIds:ids}});$("#compareResult").innerHTML=`<div class="compare-grid"><div><h3>Added / changed</h3>${listItems(r.addedClauses)}</div><div><h3>Removed / changed</h3>${listItems(r.removedClauses)}</div><div><h3>Changed numbers</h3>${listItems(r.changedNumbers)}</div><div><h3>Changed dates</h3>${listItems(r.changedDates)}</div></div>`;logEvent("document.compare",{documents:ids})}catch(e){toast(e.message)}}
+function listItems(xs=[]){return xs.length?`<ul>${xs.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<span class="muted">None detected.</span>`}
+async function saveOutput(id){const o=state.outputs.find(x=>x.id===id),content=$(`.content-editor[data-output='${CSS.escape(id)}']`)?.value.trim();if(!o||!content)return;try{const r=await api(`/api/transformations/${id}/version`,{method:"POST",body:{content}});o.content=content;o.version=r.version.version;logEvent("output.version",{outputId:id,version:o.version});render();toast("Version saved.")}catch(e){toast(e.message)}}
+async function reverify(id){try{const r=await api(`/api/transformations/${id}/verify`,{method:"POST"});const o=state.outputs.find(x=>x.id===id);if(o){o.factualityScore=r.factualityScore;o.citationCoverage=r.citationCoverage}logEvent("output.reverify",{outputId:id});render();toast(`Re-verified: ${r.factualityScore}% factuality.`)}catch(e){toast(e.message)}}
+async function exportOutput(id,format){try{const r=await api(`/api/exports/${id}`,{method:"POST",body:{format}});const blob=new Blob([r.content],{type:format==="json"?"application/json":"text/markdown"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=r.filename;a.click();URL.revokeObjectURL(a.href);logEvent("output.export",{outputId:id,format});toast(`Exported ${r.filename}`)}catch(e){toast(e.message)}}
+function reviewOutput(id,status){state.review[id]=status;persist();logEvent(`output.${status.toLowerCase().replace(/\s+/g,"_")}`,{outputId:id});render();toast(`Artifact marked ${status.toLowerCase()}.`)}
+function showChat(){const p=$("#rightPane");if(!p)return;p.innerHTML=`<div class="chat"><div id="chatLog">${state.chat.map(m=>`<div class="msg ${m.role}">${esc(m.text)}</div>`).join("")}</div><div class="chat-input"><input id="question" placeholder="Ask a question about this source…"><button class="primary" data-action="ask">Ask</button></div></div>`;$("#question")?.focus()}
+function showCompare(){const p=$("#rightPane");if(!p)return;p.innerHTML=`<div class="compare"><div class="form-grid"><label>SOURCE A<select id="compareA"><option value="">Select source</option>${state.docs.map(d=>`<option value="${esc(d.id)}">${esc(d.title)}</option>`).join("")}</select></label><label>SOURCE B<select id="compareB"><option value="">Select source</option>${state.docs.map(d=>`<option value="${esc(d.id)}">${esc(d.title)}</option>`).join("")}</select></label></div><button class="primary" data-action="compare">Compare sources</button><div id="compareResult" class="compare-result"></div></div>`}
+function bindGlobal(){document.onclick=async e=>{const nav=e.target.closest("[data-nav]");if(nav){state.view=nav.dataset.nav;render();return}const tab=e.target.closest("[data-tab]");if(tab){$$("[data-tab]").forEach(x=>x.classList.remove("active"));tab.classList.add("active");if(tab.dataset.tab==="outputs")$("#rightPane").innerHTML=generated();if(tab.dataset.tab==="chat")showChat();if(tab.dataset.tab==="compare")showCompare();return}const el=e.target.closest("[data-action]");if(!el)return;const action=el.dataset.action;try{if(action==="login")authPage(false);else if(action==="register")authPage(true);else if(action==="back")landing();else if(action==="fill-demo"){const f=$("#authForm");f.email.value="officer@transformai.gov";f.password.value="Officer@123";toast("Demo credentials filled.")}else if(action==="logout"){localStorage.removeItem("morph_token");state.token=null;state.user=null;landing()}else if(action==="new"){state.view="transform";state.activeDoc=null;state.pendingFile=null;state.decoy="";state.chat=[];render()}else if(action==="analyze")await analyze();else if(action==="generate")await generate();else if(action==="ask")await ask();else if(action==="compare")await compare();else if(action==="open-doc"){state.activeDoc=state.docs.find(x=>x.id===el.dataset.id)||null;state.view="transform";render()}else if(action==="inspect-output"){state.view="transform";render();setTimeout(()=>document.querySelector(`[data-output='${CSS.escape(el.dataset.id)}']`)?.scrollIntoView({behavior:"smooth",block:"center"}),50)}else if(action==="save")await saveOutput(el.dataset.id);else if(action==="reverify")await reverify(el.dataset.id);else if(action==="export-md")await exportOutput(el.dataset.id,"md");else if(action==="export-json")await exportOutput(el.dataset.id,"json");else if(action==="approve")reviewOutput(el.dataset.id,"Approved");else if(action==="revise")reviewOutput(el.dataset.id,"Revision Requested");else if(action==="toggle-outputs"){$$("input[name='outputType']").forEach(x=>x.checked=!$$("input[name='outputType']:checked").length)}else if(action==="immune"){const text=$("#sourceText")?.value||state.activeDoc?.text||"";const hits=(text.match(/ignore previous|system prompt|developer message|disregard instructions|jailbreak/gi)||[]);toast(hits.length?`Immune scan: ${hits.length} suspicious instruction(s) found.`:"Immune scan: no prompt-injection patterns detected.");logEvent("source.immune_scan",{hits:hits.length})}else if(action==="redact"){const t=$("#sourceText");if(t){t.value=t.value.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[REDACTED EMAIL]").replace(/\b\+?\d[\d\s().-]{8,}\d\b/g,"[REDACTED PHONE]");toast("Sanitized working copy prepared locally.");logEvent("source.redaction")}}else if(action==="bias"){const t=$("#sourceText");if(t){t.value=t.value.replace(/\b(obviously|clearly|undoubtedly|always|never)\b/gi,"[NEUTRAL]");toast("Objective working copy prepared locally.");logEvent("source.bias_neutralizer")}}else if(action==="decoy"){state.decoy="SYNTHETIC MORPH DECOY\nThis content is intentionally fabricated for sandbox testing.\nDo not treat it as a trusted source.";render();logEvent("source.synthetic_decoy")}else if(action==="copy-decoy"){await navigator.clipboard?.writeText(state.decoy);toast("Decoy copied.")}else if(action==="clear-audit"){state.audit=[];persist();render();toast("Local audit events cleared.")}else if(action==="health"){const r=await api("/api/health");toast(`Server healthy · provider: ${r.provider} · database: ${r.database}`)}}catch(err){toast(err.message||"Action failed")}};
+const fileInput=$("#fileInput");if(fileInput)fileInput.onchange=()=>{state.pendingFile=fileInput.files?.[0]||null;if(state.pendingFile){const t=$("#sourceText");if(t)t.value="";toast(`${state.pendingFile.name} selected. Click Analyze Source.`)}};const drop=$("#drop");if(drop){drop.onclick=()=>fileInput?.click();drop.ondragover=e=>{e.preventDefault();drop.classList.add("active")};drop.ondragleave=()=>drop.classList.remove("active");drop.ondrop=e=>{e.preventDefault();drop.classList.remove("active");state.pendingFile=e.dataTransfer.files?.[0]||null;if(fileInput&&state.pendingFile){const dt=new DataTransfer();dt.items.add(state.pendingFile);fileInput.files=dt.files}toast(state.pendingFile?`${state.pendingFile.name} selected. Click Analyze Source.`:"No file selected.")}};const form=$("#authForm");if(form)form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(form);const reg=!!fd.get("name");try{const r=await api(reg?"/api/auth/register":"/api/auth/login",{method:"POST",body:Object.fromEntries(fd.entries())});state.token=r.token;state.user=r.user;localStorage.setItem("morph_token",state.token);logEvent(reg?"auth.register":"auth.login",{email:r.user.email});await refresh();state.view="dashboard";render();toast("Authenticated successfully.")}catch(err){toast(err.message)}}}

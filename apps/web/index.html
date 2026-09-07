@@ -3,12 +3,41 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TransformAI | One Source. Every Audience. Every Format.</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <meta name="description" content="MORPH — Multiformat Output & Representation Processing Hub." />
+    <meta name="theme-color" content="#060a0f" />
+    <title>MORPH — Multiformat Output & Representation Processing Hub</title>
+    <link rel="stylesheet" href="/styles.css?v=20260907.5" />
+    <style>
+      html, body { font-size: 17px; }
+      button, input, select, textarea { font-size: 16px; }
+      .nav button { font-size: 15px; }
+      .hero-copy h1, .hero-copy h2 { font-size: revert; }
+
+      /* Never clip source-grounded answers/artifacts. */
+      .output-card, .result-panel, #rightPane { overflow: visible !important; }
+      .output-card pre,
+      .output-card .output-content,
+      .output-card .output-body,
+      .output-card .answer,
+      .output-card .content,
+      .output-card .result-body,
+      .output-card .artifact-content,
+      .output-card .artifact-body,
+      .output-card .markdown-body,
+      .output-card p,
+      .output-card li {
+        max-height: none !important;
+        overflow: visible !important;
+        white-space: pre-wrap !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+      .output-card pre { margin: 10px 0 0; line-height: 1.7; }
+    </style>
   </head>
   <body>
     <div id="app"></div>
     <div id="toast" aria-live="polite"></div>
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/app.js?v=20260907.5"></script>
   </body>
 </html>

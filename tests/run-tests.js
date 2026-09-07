@@ -5,62 +5,32 @@ import { verifyOutput } from "../packages/ai/verification.js";
 import { hashPassword, verifyPassword, signToken, verifyToken } from "../apps/api/auth.js";
 
 const sample = "Welfare Notification 2026\nThe Department of Social Welfare launched the Suraksha Benefit Scheme on 1 August 2026. Eligible households with annual income below INR 2,50,000 may apply. Applications close on 20 September 2026. [1] Section: Eligibility.";
-
-const parsed = parseUploadedContent({ name: "sample.txt", content: sample });
+const parsed = await parseUploadedContent({ name: "sample.txt", content: sample });
 assert.equal(parsed.fileType, "txt");
 assert.ok(parsed.text.includes("Suraksha"));
-
 const doc = { id: "doc_test", ...parsed };
 const chunks = chunkDocument(doc.id, doc.text);
 assert.ok(chunks.length >= 1);
-
 const analysis = analyzeDocument(doc, chunks);
 assert.ok(analysis.facts.length >= 3);
 assert.ok(analysis.entities.some((e) => e.name.includes("Department")));
 assert.ok(analysis.intelligence.dates.includes("1 August 2026"));
 assert.ok(analysis.intelligence.numbers.some((n) => n.includes("2,50,000")));
-
 const evidence = retrieve(chunks, "What is the deadline?", 2);
 assert.ok(evidence.length > 0);
-
 const provider = createProvider();
-const output = await provider.transform({
-  document: doc,
-  facts: analysis.facts,
-  chunks,
-  outputType: "Citizen Simplifier",
-  audience: "Citizen",
-  tone: "Simple",
-  length: "Medium",
-  channel: "Website",
-  language: "English"
-});
+const output = await provider.transform({ document: doc, facts: analysis.facts, chunks, outputType: "Citizen Simplifier", audience: "Citizen", tone: "Simple", length: "Medium", channel: "Website", language: "English" });
 assert.ok(output.content.includes("[1]"));
-
 const verification = verifyOutput(output.content, analysis.facts);
 assert.ok(verification.factualityScore >= 70);
 assert.ok(verification.citationCoverage >= 50);
-
 const bad = verifyOutput("The scheme gives free cars to all citizens.", analysis.facts);
 assert.ok(bad.unsupported >= 1);
-
-const hindi = await provider.transform({
-  document: doc,
-  facts: analysis.facts,
-  chunks,
-  outputType: "WhatsApp Generator",
-  audience: "Citizen",
-  tone: "Friendly",
-  length: "Short",
-  channel: "WhatsApp",
-  language: "Hindi"
-});
+const hindi = await provider.transform({ document: doc, facts: analysis.facts, chunks, outputType: "WhatsApp Generator", audience: "Citizen", tone: "Friendly", length: "Short", channel: "WhatsApp", language: "Hindi" });
 assert.ok(hindi.content.includes("Hindi review required"));
 assert.ok(hindi.content.includes("INR 2,50,000"));
-
 const stored = hashPassword("Secret@123");
 assert.ok(verifyPassword("Secret@123", stored));
 assert.ok(!verifyPassword("Wrong", stored));
 assert.equal(verifyToken(signToken({ sub: "user_test", role: "OFFICER" })).sub, "user_test");
-
-console.log("All TransformAI tests passed.");
+console.log("All MORPH tests passed.");

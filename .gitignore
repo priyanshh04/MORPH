@@ -1,0 +1,5 @@
+.neon
+.env.local
+
+node_modules/
+apps/web/app.backup.js
