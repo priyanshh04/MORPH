@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="MORPH — Multiformat Output & Representation Processing Hub." />
-    <meta name="theme-color" content="#060a0f" />
+    <meta name="theme-color" content="#172635" />
     <title>MORPH — Multiformat Output & Representation Processing Hub</title>
-    <link rel="stylesheet" href="/styles.css?v=20260907.5" />
+    <link rel="stylesheet" href="/styles.css?v=20260907.6" />
     <style>
       html, body { font-size: 17px; }
       button, input, select, textarea { font-size: 16px; }
@@ -33,11 +33,92 @@
         word-break: break-word !important;
       }
       .output-card pre { margin: 10px 0 0; line-height: 1.7; }
+
+      /* MORPH hybrid visual system: mostly light, with a restrained dark shell. */
+      :root {
+        --bg: #eef2f5;
+        --panel: #ffffff;
+        --panel2: #f7f9fb;
+        --line: #d4dde5;
+        --line2: #e4eaf0;
+        --ink: #172635;
+        --muted: #5d7082;
+        --faint: #7c8d9d;
+        --brand: #0f8f8b;
+        --accent: #9b6800;
+        --ok: #16784d;
+        --warn: #9a6500;
+        --danger: #c43d3d;
+      }
+
+      html, body { background: #eef2f5 !important; color: #172635 !important; }
+      .landing { background: radial-gradient(circle at 82% 15%, rgba(45,108,223,.08), transparent 33%), radial-gradient(circle at 10% 80%, rgba(15,143,139,.07), transparent 30%), #eef2f5 !important; }
+      .topbar { background: #ffffff !important; color: #172635 !important; }
+      .app-shell { background: #eef2f5 !important; }
+      .main { background: #eef2f5 !important; }
+
+      /* Keep only the navigation chrome dark for visual contrast. */
+      .sidebar {
+        background: #172635 !important;
+        color: #eef5f8 !important;
+        border-right: 1px solid #263b4c !important;
+      }
+      .sidebar-brand, .sidebar-brand * { color: #f4f8fa; }
+      .sidebar .secure-badge {
+        background: #203443 !important;
+        border-color: #355064 !important;
+        color: #c6d4de !important;
+      }
+      .sidebar .nav button { color: #b8c8d3 !important; background: transparent !important; border-color: transparent !important; }
+      .sidebar .nav button span { color: #91a7b7 !important; }
+      .sidebar .nav button.active,
+      .sidebar .nav button:hover {
+        background: #263d4e !important;
+        border-color: #3a566b !important;
+        color: #ffffff !important;
+      }
+      .sidebar .nav button.active span { color: #55d6d0 !important; }
+      .sidebar-source {
+        background: #203443 !important;
+        border-color: #355064 !important;
+        color: #dce7ed !important;
+      }
+      .sidebar-source > span, .sidebar-source > small { color: #9eb2c0 !important; }
+      .sidebar-source b { color: #f2f7fa !important; }
+      .user-box { border-top-color: #355064 !important; color: #dce7ed !important; }
+      .user-box small { color: #9eb2c0 !important; }
+
+      /* Light working surface. */
+      .panel, .metric-card, .output-card, .landing-console {
+        background: #ffffff !important;
+        color: #172635 !important;
+        border-color: #d4dde5 !important;
+      }
+      .flow-step, .pipeline-preview > div, .source-summary, .output-option, .msg, .compare-grid > div, .intel-grid div {
+        background: #f7f9fb !important;
+        border-color: #dfe6ec !important;
+      }
+      input, select, textarea, .content-editor {
+        background: #fbfcfd !important;
+        color: #172635 !important;
+        border-color: #cbd7e1 !important;
+      }
+      input::placeholder, textarea::placeholder { color: #8797a6 !important; opacity: 1; }
+      .drop { background: #f7fafc !important; border-color: #8fa9bb !important; }
+      .drop:hover, .drop.active { background: #effaf9 !important; }
+      .result-tabs button { background: #ffffff !important; color: #42576a !important; }
+      .result-tabs button.active { background: #eaf7f6 !important; color: #08736f !important; }
+      .content-editor { min-height: 420px !important; max-height: none !important; overflow: auto !important; white-space: pre-wrap !important; overflow-wrap: anywhere !important; line-height: 1.75 !important; font-size: 16px !important; }
+      .output-card h3, .output-card b, .section-head h2, .main-top h1 { color: #172635 !important; }
+      .table th { color: #667a8d !important; }
+      .table td, .compare-grid li { color: #43576a !important; }
+      .helper, .output-meta, .trace span, .feature p { color: #627588 !important; }
+      #toast { background: #172635 !important; border-color: #355064 !important; }
     </style>
   </head>
   <body>
     <div id="app"></div>
     <div id="toast" aria-live="polite"></div>
-    <script type="module" src="/app.js?v=20260907.5"></script>
+    <script type="module" src="/app.js?v=20260907.6"></script>
   </body>
 </html>
