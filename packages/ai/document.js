@@ -114,7 +114,7 @@ function isUsableClaim(s) {
 }
 function rankClaims(sentences) {
   const seen = new Set();
-  return sentences.map((s, i) => ({ s, i, score: claimScore(s) })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score || a.i - b.i).filter((x) => { const k = normalize(x.s); if (seen.has(k)) return false; seen.add(k); return true; }).map((x) => x.s);
+  return sentences.map((s, i) => ({ s, i, score: claimScore(s) })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score || a.i - b.i).filter((x) => { const k = normalizeText(x.s); if (seen.has(k)) return false; seen.add(k); return true; }).map((x) => x.s);
 }
 function claimScore(s) {
   let score = 5;
