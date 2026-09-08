@@ -89,7 +89,21 @@ function render(type,c,length){
     default:return`SOURCE-GROUNDED OUTPUT\n${c.title}\n\n${list(p)}`;
   }
 }
-function faq(c,profile){const a=[];const add=(q,f)=>f&&a.length<profile.questions&&a.push(`Q${a.length+1}. ${q}\nA. ${f.text} ${f.marker}`);add("When was it launched or released?",c.launch.find(f=>hasDate(f.text))||c.launch[0]);add("Who is the audience or affected group?",c.eligibility[0]);add("What result, benefit or feature is described?",c.benefits[0]);add("What price, amount, rating or metric is stated?",c.facts.find(f=>matches(f.text,MONEY_RE).length||/rating|score|price|sales|revenue|profit/i.test(f.text)));for(const f of c.facts)add(`What does the source say about ${subject(f.text)}?`,f);return`FREQUENTLY ASKED QUESTIONS\n${c.title}\n\n${a.length?a.join("\n\n"):FALLBACK}`;}
+function faq(c,profile){
+  const a=[];
+  const add=(q,f,missing="The source does not explicitly state this.")=>{
+    if(a.length>=profile.questions)return;
+    const answer=f?.text?`${f.text}${f.marker?` ${f.marker}`:""}`:missing;
+    a.push(`Q${a.length+1}. ${q}\nA. ${answer}`);
+  };
+  add("When was it launched or released?",c.launch.find(f=>hasDate(f.text))||c.launch[0]);
+  add("Who is the audience or affected group?",c.eligibility[0]);
+  add("What result, benefit or feature is described?",c.benefits[0]);
+  const metric=c.facts.find(f=>matches(f.text,MONEY_RE).length||/rating|score|price|sales|revenue|profit|amount|metric/i.test(f.text));
+  add("What price, amount, rating or metric is stated?",metric,"No explicit price, amount, rating, or metric is stated in the analyzed source.");
+  for(const f of c.facts)add(`What does the source say about ${subject(f.text)}?`,f);
+  return`FREQUENTLY ASKED QUESTIONS\n${c.title}\n\n${a.length?a.join("\n\n"):FALLBACK}`;
+}
 function slides(c,profile){const groups=[["Key facts",c.facts.slice(0,profile.slides)],["Audience",c.eligibility.slice(0,profile.slides)],["Results / figures",c.benefits.slice(0,profile.slides)],["Dates",c.deadlines.length?c.deadlines.slice(0,profile.slides):c.launch.slice(0,profile.slides)],["Actions",c.actions.slice(0,profile.slides)]];return`PRESENTATION OUTLINE\n\n${groups.filter(x=>x[1].length).map((x,i)=>`Slide ${i+1} — ${x[0]}\n${x[1].map(f=>`• ${f.text} ${f.marker}`).join("\n")}`).join("\n\n")}`;}
 function uniqueFacts(a){const s=new Set();return a.filter(f=>{const k=normalize(f.claim||"");if(!k||s.has(k))return false;s.add(k);return true;});}
 function usedFacts(content,facts){const c=normalize(content);return facts.filter(f=>c.includes(normalize(f.claim).slice(0,Math.min(70,normalize(f.claim).length)))).slice(0,20);}
