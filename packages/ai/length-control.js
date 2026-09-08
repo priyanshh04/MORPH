@@ -15,10 +15,122 @@ DemoAIProvider.prototype.transform = async function (args) {
   const result = await originalTransform.call(this, args);
   if (!result?.content) return result;
 
+  const facts = args.facts || [];
+  let text = String(result.content).trim();
+
+  // FAQ output must contain an answer for every generated question.
+  // If the base generator leaves a question unanswered, select the most
+  // relevant source-backed fact instead of inventing an answer.
+  if (args.outputType === "FAQ Generator") {
+    text = repairFaqAnswers(text, facts);
+  }
+
   const profile = PROFILES[args.length] || PROFILES.Medium;
-  result.content = enforceLength(result.content, args.facts || [], profile);
+  result.content = enforceLength(text, facts, profile);
   return result;
 };
+
+function repairFaqAnswers(content, facts) {
+  const lines = String(content).split(/\n/);
+  const out = [];
+  let pendingQuestion = null;
+  let answerSeen = false;
+  const usedFacts = new Set();
+
+  const flushQuestion = () => {
+    if (pendingQuestion && !answerSeen) {
+      out.push(answerForQuestion(pendingQuestion, facts, usedFacts));
+    }
+    pendingQuestion = null;
+    answerSeen = false;
+  };
+
+  for (const line of lines) {
+    const q = line.match(/^\s*Q\d+\.\s*(.+?)\s*$/i);
+    const a = line.match(/^\s*A(?:\d+)?[.:]\s*(.+?)\s*$/i);
+
+    if (q) {
+      flushQuestion();
+      pendingQuestion = q[1];
+      out.push(line);
+      continue;
+    }
+
+    if (a) {
+      answerSeen = true;
+      markFactCitations(a[1], facts, usedFacts);
+      out.push(line);
+      continue;
+    }
+
+    // Preserve normal text/continuation lines exactly. They do not count as
+    // an answer unless the FAQ explicitly labels them as one.
+    out.push(line);
+  }
+
+  flushQuestion();
+  return out.join("\n");
+}
+
+function answerForQuestion(question, facts, usedFacts) {
+  const qTerms = meaningfulTerms(question);
+  let best = null;
+  let bestScore = 0;
+
+  facts.forEach((fact, index) => {
+    const claim = String(fact?.claim || "").trim();
+    if (!claim || claim.length < 8) return;
+
+    const terms = meaningfulTerms(claim);
+    let score = 0;
+    for (const term of qTerms) {
+      if (terms.includes(term)) score += 4;
+      else if (terms.some(t => t.includes(term) || term.includes(t))) score += 1;
+    }
+
+    // Prefer a fact that has not already been used by another repaired FAQ.
+    if (!usedFacts.has(index)) score += 1;
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = { claim, index };
+    }
+  });
+
+  if (!best || bestScore <= 0) {
+    return "A. The source does not explicitly state this.";
+  }
+
+  usedFacts.add(best.index);
+  return `A. ${best.claim} [${best.index + 1}]`;
+}
+
+function markFactCitations(answer, facts, usedFacts) {
+  const matches = [...String(answer).matchAll(/\[(\d+)\]/g)];
+  for (const match of matches) {
+    const index = Number(match[1]) - 1;
+    if (index >= 0 && index < facts.length) usedFacts.add(index);
+  }
+}
+
+function meaningfulTerms(text) {
+  const stop = new Set([
+    "the", "and", "for", "with", "from", "this", "that", "what", "when",
+    "where", "which", "who", "whom", "how", "does", "did", "are", "is",
+    "was", "were", "has", "have", "had", "can", "could", "would", "should",
+    "about", "into", "their", "there", "here", "your", "they", "them", "our",
+    "you", "not", "its", "also", "than", "then", "these", "those", "source",
+    "described", "describe", "provided", "mentioned", "question", "answer"
+  ]);
+
+  return [...new Set(
+    String(text)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter(word => word.length > 2 && !stop.has(word))
+  )];
+}
 
 function enforceLength(content, facts, profile) {
   let text = String(content).trim();
