@@ -1,10 +1,8 @@
 import { DemoAIProvider } from "./provider.js";
 
-// MORPH supports the languages exposed by the Transformation Controls.
-// The local source engine creates the grounded artifact first; this layer
-// translates that artifact while preserving source citations, numbers and
-// document names. If the translation service is unavailable, MORPH returns
-// the original grounded English artifact rather than fabricating a translation.
+// MORPH supports every language exposed by Transformation Controls.
+// The source-grounded artifact is generated first, then translated while
+// preserving citations, numbers and document-specific facts.
 const originalTransform = DemoAIProvider.prototype.transform;
 
 const LANG = {
@@ -22,9 +20,7 @@ const LANG = {
 };
 
 const HINGLISH = "Hinglish";
-// MyMemory has a 500-character query limit. Keep a safer margin because
-// protected citation/number tokens can expand the text before it is sent.
-const MAX_CHUNK = 350;
+const MAX_CHUNK = 300;
 
 DemoAIProvider.prototype.transform = async function (args) {
   const result = await originalTransform.call(this, args);
@@ -34,10 +30,11 @@ DemoAIProvider.prototype.transform = async function (args) {
 
   try {
     result.content = await translateArtifact(result.content, language);
-    result.title = await translateShort(result.title, language);
+    if (result.title) result.title = await translateShort(result.title, language);
     result.language = language;
+    result.translationFallback = false;
   } catch (error) {
-    // Translation must never break generation or compromise source grounding.
+    // A translation failure must never replace grounded output with an error.
     console.warn(`MORPH ${language} translation fallback:`, error.message);
     result.language = "English";
     result.translationFallback = true;
@@ -50,40 +47,74 @@ async function translateArtifact(text, language) {
   const chunks = splitForTranslation(protectedText);
   const translated = [];
 
-  for (const chunk of chunks) translated.push(await translateChunk(chunk, language));
+  for (const chunk of chunks) {
+    translated.push(await translateChunk(chunk, language));
+  }
+
   return restoreTokens(translated.join("\n"));
 }
 
 async function translateShort(text, language) {
-  if (!text) return text;
   const protectedText = protectTokens(String(text));
   return restoreTokens(await translateChunk(protectedText, language));
 }
 
 async function translateChunk(text, language) {
   if (!text.trim()) return text;
+
   if (language === HINGLISH) {
-    const hindi = await translateWithRetry(text, "hi");
+    // Translate to Hindi first, then convert Hindi script to Roman script.
+    const hindi = await translateWithProviders(text, "hi");
     return transliterateHindi(hindi);
   }
-  return translateWithRetry(text, LANG[language]);
+
+  return translateWithProviders(text, LANG[language]);
 }
 
-async function translateWithRetry(text, target) {
+async function translateWithProviders(text, target) {
+  // Google Translate's public translation endpoint supports all languages
+  // used by MORPH and is more reliable for Indian-language coverage.
   try {
-    return await memorySafeTranslate(text, target);
-  } catch (error) {
-    // Never expose a provider error as generated content. If a provider still
-    // rejects a safe chunk, split it further and retry the smaller pieces.
-    if (text.length <= 180) throw error;
-    const parts = splitTextSafely(text, 180);
-    const translated = [];
-    for (const part of parts) translated.push(await memorySafeTranslate(part, target));
-    return translated.join(" ");
+    return await googleTranslate(text, target);
+  } catch (googleError) {
+    console.warn(`MORPH Google translation fallback (${target}):`, googleError.message);
+  }
+
+  // Keep MyMemory as a secondary provider for resilience.
+  try {
+    return await myMemoryTranslate(text, target);
+  } catch (memoryError) {
+    throw new Error(`all translation providers failed for ${target}: ${memoryError.message}`);
   }
 }
 
-async function memorySafeTranslate(text, target) {
+async function googleTranslate(text, target) {
+  const url = new URL("https://translate.googleapis.com/translate_a/single");
+  url.searchParams.set("client", "gtx");
+  url.searchParams.set("sl", "en");
+  url.searchParams.set("tl", target);
+  url.searchParams.set("dt", "t");
+  url.searchParams.set("q", text);
+
+  const response = await fetch(url, {
+    headers: { Accept: "application/json", "User-Agent": "MORPH/1.0" },
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!response.ok) throw new Error(`Google translation HTTP ${response.status}`);
+
+  const data = await response.json();
+  const translated = Array.isArray(data?.[0])
+    ? data[0].map(part => Array.isArray(part) ? part[0] : "").join("")
+    : "";
+
+  if (!translated.trim()) throw new Error("Google translation returned empty text");
+  if (/QUERY LENGTH LIMIT EXCEEDED|MYMEMORY WARNING/i.test(translated)) {
+    throw new Error("translation provider returned an unusable response");
+  }
+  return translated.trim();
+}
+
+async function myMemoryTranslate(text, target) {
   const url = new URL("https://api.mymemory.translated.net/get");
   url.searchParams.set("q", text);
   url.searchParams.set("langpair", `en|${target}`);
@@ -93,31 +124,43 @@ async function memorySafeTranslate(text, target) {
     headers: { Accept: "application/json", "User-Agent": "MORPH/1.0" },
     signal: AbortSignal.timeout(15000)
   });
-  if (!response.ok) throw new Error(`translation service HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`MyMemory HTTP ${response.status}`);
 
   const data = await response.json();
   const translated = String(data?.responseData?.translatedText || "").trim();
   if (!translated || /MYMEMORY WARNING|QUERY LENGTH LIMIT EXCEEDED/i.test(translated)) {
-    throw new Error("translation service returned a query-limit or unusable response");
+    throw new Error("MyMemory returned an unusable response");
   }
   return translated;
 }
 
 async function transliterateHindi(text) {
-  const url = new URL("https://inputtools.google.com/request");
-  url.searchParams.set("text", text);
-  url.searchParams.set("itc", "hi-t-i0-und");
-  url.searchParams.set("num", "1");
-  url.searchParams.set("cp", "0");
-  url.searchParams.set("cs", "1");
-  url.searchParams.set("ie", "utf-8");
-  url.searchParams.set("oe", "utf-8");
+  const pieces = splitTextSafely(text, 250);
+  const result = [];
 
-  const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  if (!response.ok) throw new Error(`transliteration service HTTP ${response.status}`);
-  const data = await response.json();
-  const result = data?.[1]?.[0]?.[1]?.[0];
-  return Array.isArray(result) ? result[0] : String(result || text);
+  for (const piece of pieces) {
+    const url = new URL("https://inputtools.google.com/request");
+    url.searchParams.set("text", piece);
+    url.searchParams.set("itc", "hi-t-i0-und");
+    url.searchParams.set("num", "1");
+    url.searchParams.set("cp", "0");
+    url.searchParams.set("cs", "1");
+    url.searchParams.set("ie", "utf-8");
+    url.searchParams.set("oe", "utf-8");
+
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!response.ok) throw new Error(`transliteration HTTP ${response.status}`);
+      const data = await response.json();
+      const value = data?.[1]?.[0]?.[1]?.[0];
+      result.push(Array.isArray(value) ? value[0] : String(value || piece));
+    } catch {
+      // If transliteration is unavailable, retain the valid Hindi translation.
+      result.push(piece);
+    }
+  }
+
+  return result.join(" ");
 }
 
 function splitForTranslation(text) {
@@ -131,14 +174,16 @@ function splitForTranslation(text) {
       current = candidate;
       continue;
     }
+
     if (current) chunks.push(current);
     if (line.length <= MAX_CHUNK) {
       current = line;
-      continue;
+    } else {
+      chunks.push(...splitTextSafely(line, MAX_CHUNK));
+      current = "";
     }
-    chunks.push(...splitTextSafely(line, MAX_CHUNK));
-    current = "";
   }
+
   if (current) chunks.push(current);
   return chunks;
 }
@@ -146,12 +191,14 @@ function splitForTranslation(text) {
 function splitTextSafely(text, maxLength) {
   const chunks = [];
   let remaining = String(text);
+
   while (remaining.length > maxLength) {
     let cut = remaining.lastIndexOf(" ", maxLength);
     if (cut < Math.floor(maxLength * 0.55)) cut = maxLength;
     chunks.push(remaining.slice(0, cut).trim());
     remaining = remaining.slice(cut).trimStart();
   }
+
   if (remaining) chunks.push(remaining);
   return chunks;
 }
@@ -160,7 +207,7 @@ function protectTokens(text) {
   return String(text)
     .replace(/\[(\d+)\]/g, " MORPHCITE$1MORPHEND ")
     .replace(/(₹|\$|€|£)\s?[\d,.]+/g, match => ` MORPHNUM${Buffer.from(match).toString("base64url")}MORPHEND `)
-    .replace(/\b\d+(?:[,.]\d+)*%\b/g, match => ` MORPHPCT${match.replace(/[^0-9.,]/g, "")}MORPHEND `);
+    .replace(/\b\d+(?:[,.]\d+)*%/g, match => ` MORPHPCT${match.replace(/[^0-9.,]/g, "")}MORPHEND `);
 }
 
 function restoreTokens(text) {
