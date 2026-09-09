@@ -25,8 +25,14 @@ DemoAIProvider.prototype.transform = async function (args) {
     text = repairFaqAnswers(text, facts);
   }
 
+  // Audience, tone and channel are transformation controls, not decorative
+  // UI fields. Adapt the source-grounded result so each choice has a visible
+  // and relevant effect while keeping every factual claim tied to the source.
+  text = adaptOutput(text, args, facts);
+
   const profile = PROFILES[args.length] || PROFILES.Medium;
   result.content = enforceLength(text, facts, profile);
+  result.title = `${args.outputType} for ${args.audience || "Citizen"}`;
   return result;
 };
 
@@ -63,8 +69,6 @@ function repairFaqAnswers(content, facts) {
       continue;
     }
 
-    // Preserve normal text/continuation lines exactly. They do not count as
-    // an answer unless the FAQ explicitly labels them as one.
     out.push(line);
   }
 
@@ -88,7 +92,6 @@ function answerForQuestion(question, facts, usedFacts) {
       else if (terms.some(t => t.includes(term) || term.includes(t))) score += 1;
     }
 
-    // Prefer a fact that has not already been used by another repaired FAQ.
     if (!usedFacts.has(index)) score += 1;
 
     if (score > bestScore) {
@@ -132,6 +135,126 @@ function meaningfulTerms(text) {
   )];
 }
 
+function adaptOutput(content, args, facts) {
+  const audience = String(args.audience || "Citizen");
+  const tone = String(args.tone || "Professional");
+  const channel = String(args.channel || "Website");
+  const outputType = String(args.outputType || "Output");
+
+  const ranked = rankFactsForAudience(facts, audience);
+  const selected = ranked.slice(0, audienceFactLimit(audience));
+  const sourceFacts = selected.length
+    ? selected.map((fact, index) => `• ${fact.claim} [${fact.index + 1}]`).join("\n")
+    : "• The source does not explicitly state additional audience-specific details.";
+
+  const toneLead = toneIntroduction(tone, audience, outputType);
+  const audienceSection = audienceHeading(audience);
+
+  // Keep the original generator output intact as the core artifact. The
+  // controlled additions below change emphasis and presentation using only
+  // facts already extracted from the source.
+  let adapted = `${toneLead}\n\n${audienceSection}\n${sourceFacts}\n\n${content}`;
+
+  if (channel === "WhatsApp") {
+    adapted = `MORPH UPDATE — ${audience}\n${toneLead}\n\n${compactForChannel(adapted)}`;
+  } else if (channel === "Email") {
+    adapted = `SUBJECT: ${emailSubject(outputType, audience)}\n\nHello,\n\n${adapted}\n\nRegards,\nMORPH`;
+  } else if (channel === "Social Media") {
+    adapted = `SOCIAL MEDIA BRIEF\n${toneLead}\n\n${sourceFacts}\n\n${content}`;
+  } else if (channel === "SMS") {
+    adapted = `MORPH ALERT — ${shortChannelText(toneLead, sourceFacts, content)}`;
+  } else if (channel === "Presentation") {
+    adapted = `SLIDE CONTENT — ${audience}\n\n${audienceSection}\n${sourceFacts}\n\n${content}`;
+  } else if (channel === "Report") {
+    adapted = `REPORTING VIEW — ${audience}\n\n${audienceSection}\n${sourceFacts}\n\n${content}`;
+  } else if (channel === "Voice") {
+    adapted = `VOICE BRIEF — ${audience}\n\n${toneLead}\n\n${spoken(adapted)}`;
+  }
+
+  return adapted;
+}
+
+function rankFactsForAudience(facts, audience) {
+  const rules = {
+    Citizen: ["benefit", "eligible", "beneficiar", "apply", "support", "receive", "deadline", "what"],
+    Officer: ["require", "must", "shall", "deadline", "implement", "verify", "submit", "report"],
+    Executive: ["revenue", "sales", "profit", "budget", "amount", "result", "impact", "total", "growth"],
+    Student: ["education", "learn", "definition", "meaning", "example", "concept", "class", "student"],
+    Media: ["launch", "released", "announced", "headline", "date", "event", "company", "result"],
+    "General Public": ["overview", "benefit", "impact", "support", "public", "result", "important", "deadline"]
+  };
+  const terms = rules[audience] || rules.Citizen;
+
+  return facts
+    .map((fact, index) => {
+      const claim = String(fact?.claim || "");
+      const lower = claim.toLowerCase();
+      let score = 0;
+      for (const term of terms) if (lower.includes(term)) score += 3;
+      score += Math.max(0, 2 - index * 0.02);
+      return { fact, index, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map(x => ({ ...x.fact, index: x.index }));
+}
+
+function audienceFactLimit(audience) {
+  return {
+    Citizen: 5,
+    Officer: 6,
+    Executive: 5,
+    Student: 5,
+    Media: 5,
+    "General Public": 5
+  }[audience] || 5;
+}
+
+function audienceHeading(audience) {
+  return {
+    Citizen: "CITIZEN FOCUS — practical benefits, eligibility and next steps",
+    Officer: "OFFICER FOCUS — requirements, implementation and deadlines",
+    Executive: "EXECUTIVE FOCUS — outcomes, metrics and material figures",
+    Student: "STUDENT FOCUS — concepts, facts and learning points",
+    Media: "MEDIA FOCUS — notable facts, events, dates and results",
+    "General Public": "PUBLIC FOCUS — what it means, why it matters and key facts"
+  }[audience] || `AUDIENCE FOCUS — ${audience}`;
+}
+
+function toneIntroduction(tone, audience, outputType) {
+  return {
+    Formal: `Formal ${outputType} prepared for ${audience}, using source-grounded language and precise wording.`,
+    Simple: `Here is a simple, easy-to-follow ${outputType.toLowerCase()} for ${audience}.`,
+    Professional: `Professional ${outputType.toLowerCase()} tailored for ${audience}, with the source facts kept clear and actionable.`,
+    Friendly: `Here is a friendly, approachable ${outputType.toLowerCase()} for ${audience}, while keeping the source facts unchanged.`,
+    Urgent: `Important ${outputType.toLowerCase()} for ${audience}: review the source-backed points and any stated deadlines promptly.`,
+    Educational: `Educational ${outputType.toLowerCase()} for ${audience}, highlighting the source-backed information most useful for understanding the topic.`
+  }[tone] || `Source-grounded ${outputType.toLowerCase()} for ${audience}.`;
+}
+
+function compactForChannel(text) {
+  return text
+    .split(/\n+/)
+    .filter(Boolean)
+    .map(line => line.replace(/^\s+/, "").trim())
+    .join("\n");
+}
+
+function emailSubject(outputType, audience) {
+  return `${outputType} — ${audience} source update`;
+}
+
+function shortChannelText(lead, sourceFacts, content) {
+  const combined = `${lead} ${sourceFacts} ${content}`;
+  return combined.split(/\s+/).slice(0, 75).join(" ") + (combined.split(/\s+/).length > 75 ? " …" : "");
+}
+
+function spoken(text) {
+  return String(text)
+    .replace(/\b[A-Z][A-Z /—-]{3,}\b/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function enforceLength(content, facts, profile) {
   let text = String(content).trim();
   const words = countWords(text);
@@ -139,7 +262,6 @@ function enforceLength(content, facts, profile) {
   if (words > profile.max) return trimAtWords(text, profile.max);
   if (words >= profile.min) return text;
 
-  // Add only source-backed facts. No new facts are invented.
   const existing = text.toLowerCase();
   const additions = [];
   for (let i = 0; i < facts.length && countWords(text + "\n" + additions.join("\n")) < profile.min; i++) {
