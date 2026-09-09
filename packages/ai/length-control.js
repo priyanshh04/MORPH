@@ -1,8 +1,6 @@
 import { DemoAIProvider } from "./provider.js";
 
 // Enforce meaningful separation between Short / Medium / Detailed outputs.
-// The existing provider changes how many facts are selected, but some documents
-// contain too few facts for that alone to create a visible length difference.
 const originalTransform = DemoAIProvider.prototype.transform;
 
 const PROFILES = {
@@ -18,9 +16,6 @@ DemoAIProvider.prototype.transform = async function (args) {
   const facts = args.facts || [];
   let text = String(result.content).trim();
 
-  // FAQ output must contain an answer for every generated question.
-  // If the base generator leaves a question unanswered, select the most
-  // relevant source-backed fact instead of inventing an answer.
   if (args.outputType === "FAQ Generator") {
     text = repairFaqAnswers(text, facts);
   }
@@ -44,9 +39,7 @@ function repairFaqAnswers(content, facts) {
   const usedFacts = new Set();
 
   const flushQuestion = () => {
-    if (pendingQuestion && !answerSeen) {
-      out.push(answerForQuestion(pendingQuestion, facts, usedFacts));
-    }
+    if (pendingQuestion && !answerSeen) out.push(answerForQuestion(pendingQuestion, facts, usedFacts));
     pendingQuestion = null;
     answerSeen = false;
   };
@@ -54,24 +47,20 @@ function repairFaqAnswers(content, facts) {
   for (const line of lines) {
     const q = line.match(/^\s*Q\d+\.\s*(.+?)\s*$/i);
     const a = line.match(/^\s*A(?:\d+)?[.:]\s*(.+?)\s*$/i);
-
     if (q) {
       flushQuestion();
       pendingQuestion = q[1];
       out.push(line);
       continue;
     }
-
     if (a) {
       answerSeen = true;
       markFactCitations(a[1], facts, usedFacts);
       out.push(line);
       continue;
     }
-
     out.push(line);
   }
-
   flushQuestion();
   return out.join("\n");
 }
@@ -80,30 +69,22 @@ function answerForQuestion(question, facts, usedFacts) {
   const qTerms = meaningfulTerms(question);
   let best = null;
   let bestScore = 0;
-
   facts.forEach((fact, index) => {
     const claim = String(fact?.claim || "").trim();
     if (!claim || claim.length < 8) return;
-
     const terms = meaningfulTerms(claim);
     let score = 0;
     for (const term of qTerms) {
       if (terms.includes(term)) score += 4;
       else if (terms.some(t => t.includes(term) || term.includes(t))) score += 1;
     }
-
     if (!usedFacts.has(index)) score += 1;
-
     if (score > bestScore) {
       bestScore = score;
       best = { claim, index };
     }
   });
-
-  if (!best || bestScore <= 0) {
-    return "A. The source does not explicitly state this.";
-  }
-
+  if (!best || bestScore <= 0) return "A. The source does not explicitly state this.";
   usedFacts.add(best.index);
   return `A. ${best.claim} [${best.index + 1}]`;
 }
@@ -125,14 +106,7 @@ function meaningfulTerms(text) {
     "you", "not", "its", "also", "than", "then", "these", "those", "source",
     "described", "describe", "provided", "mentioned", "question", "answer"
   ]);
-
-  return [...new Set(
-    String(text)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .split(/\s+/)
-      .filter(word => word.length > 2 && !stop.has(word))
-  )];
+  return [...new Set(String(text).toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter(word => word.length > 2 && !stop.has(word)))];
 }
 
 function adaptOutput(content, args, facts) {
@@ -149,29 +123,87 @@ function adaptOutput(content, args, facts) {
 
   const toneLead = toneIntroduction(tone, audience, outputType);
   const audienceSection = audienceHeading(audience);
+  const toneBody = applyToneToBody(content, tone);
 
-  // Keep the original generator output intact as the core artifact. The
-  // controlled additions below change emphasis and presentation using only
-  // facts already extracted from the source.
-  let adapted = `${toneLead}\n\n${audienceSection}\n${sourceFacts}\n\n${content}`;
+  // The previous implementation changed only toneLead, so Professional and
+  // Friendly produced almost identical bodies. Apply the selected tone to
+  // every factual bullet, FAQ answer, and relevant section heading as well.
+  let adapted = `${toneLead}\n\n${audienceSection}\n${sourceFacts}\n\n${toneBody}`;
 
   if (channel === "WhatsApp") {
-    adapted = `MORPH UPDATE — ${audience}\n${toneLead}\n\n${compactForChannel(adapted)}`;
+    adapted = `MORPH UPDATE — ${audience}\n${toneLead}\n\n${compactForChannel(`${audienceSection}\n${sourceFacts}\n\n${toneBody}`)}`;
   } else if (channel === "Email") {
-    adapted = `SUBJECT: ${emailSubject(outputType, audience)}\n\nHello,\n\n${adapted}\n\nRegards,\nMORPH`;
+    adapted = `SUBJECT: ${emailSubject(outputType, audience)}\n\nHello,\n\n${toneLead}\n\n${audienceSection}\n${sourceFacts}\n\n${toneBody}\n\nRegards,\nMORPH`;
   } else if (channel === "Social Media") {
-    adapted = `SOCIAL MEDIA BRIEF\n${toneLead}\n\n${sourceFacts}\n\n${content}`;
+    adapted = `SOCIAL MEDIA BRIEF\n${toneLead}\n\n${sourceFacts}\n\n${toneBody}`;
   } else if (channel === "SMS") {
-    adapted = `MORPH ALERT — ${shortChannelText(toneLead, sourceFacts, content)}`;
+    adapted = `MORPH ALERT — ${shortChannelText(toneLead, sourceFacts, toneBody)}`;
   } else if (channel === "Presentation") {
-    adapted = `SLIDE CONTENT — ${audience}\n\n${audienceSection}\n${sourceFacts}\n\n${content}`;
+    adapted = `SLIDE CONTENT — ${audience}\n\n${audienceSection}\n${sourceFacts}\n\n${toneBody}`;
   } else if (channel === "Report") {
-    adapted = `REPORTING VIEW — ${audience}\n\n${audienceSection}\n${sourceFacts}\n\n${content}`;
+    adapted = `REPORTING VIEW — ${audience}\n\n${audienceSection}\n${sourceFacts}\n\n${toneBody}`;
   } else if (channel === "Voice") {
-    adapted = `VOICE BRIEF — ${audience}\n\n${toneLead}\n\n${spoken(adapted)}`;
+    adapted = `VOICE BRIEF — ${audience}\n\n${toneLead}\n\n${spoken(`${audienceSection}\n${sourceFacts}\n\n${toneBody}`)}`;
   }
 
   return adapted;
+}
+
+function applyToneToBody(content, tone) {
+  const profile = {
+    Formal: {
+      prefix: "According to the source:",
+      answer: "According to the source,",
+      heading: { "KEY POINTS": "FORMAL KEY FACTS", "BENEFITS / RESULTS": "BENEFITS / OUTCOMES", "WHAT TO DO": "REQUIRED ACTIONS", "DATES": "DATES / TIMELINES" }
+    },
+    Simple: {
+      prefix: "In simple terms:",
+      answer: "Simply put,",
+      heading: { "KEY POINTS": "MAIN POINTS", "BENEFITS / RESULTS": "WHAT THIS MEANS", "WHAT TO DO": "WHAT YOU NEED TO DO", "DATES": "IMPORTANT DATES" }
+    },
+    Professional: {
+      prefix: "Key point:",
+      answer: "The source states that",
+      heading: { "KEY POINTS": "KEY POINTS", "BENEFITS / RESULTS": "BENEFITS / RESULTS", "WHAT TO DO": "NEXT ACTIONS", "DATES": "DATES / TIMELINES" }
+    },
+    Friendly: {
+      prefix: "Good to know:",
+      answer: "The useful takeaway is that",
+      heading: { "KEY POINTS": "KEY THINGS TO KNOW", "BENEFITS / RESULTS": "WHY IT MATTERS", "WHAT TO DO": "WHAT YOU CAN DO", "DATES": "DATES TO KEEP IN MIND" }
+    },
+    Urgent: {
+      prefix: "IMPORTANT:",
+      answer: "Important: the source states that",
+      heading: { "KEY POINTS": "CRITICAL POINTS", "BENEFITS / RESULTS": "IMPACT / RESULTS", "WHAT TO DO": "ACTIONS TO TAKE", "DATES": "IMPORTANT DEADLINES / DATES" }
+    },
+    Educational: {
+      prefix: "Learn:",
+      answer: "The key idea is that",
+      heading: { "KEY POINTS": "CORE CONCEPTS", "BENEFITS / RESULTS": "EFFECTS / RESULTS", "WHAT TO DO": "STEPS / ACTIONS", "DATES": "KEY DATES" }
+    }
+  };
+  const p = profile[tone] || profile.Professional;
+  return String(content).split("\n").map(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return line;
+
+    if (p.heading[trimmed]) return p.heading[trimmed];
+
+    if (/^Q\d+\.\s+/i.test(trimmed)) return line;
+
+    if (/^A(?:\d+)?[.:]\s+/i.test(trimmed)) {
+      const answer = trimmed.replace(/^A(?:\d+)?[.:]\s+/i, "");
+      return `A. ${p.answer} ${answer}`;
+    }
+
+    if (/^[•☐-]\s+/.test(trimmed)) {
+      const marker = trimmed.match(/^[•☐-]\s+/)[0];
+      const body = trimmed.replace(/^[•☐-]\s+/, "");
+      if (!body.startsWith(p.prefix)) return `${marker}${p.prefix} ${body}`;
+    }
+
+    return line;
+  }).join("\n").trim();
 }
 
 function rankFactsForAudience(facts, audience) {
@@ -184,29 +216,18 @@ function rankFactsForAudience(facts, audience) {
     "General Public": ["overview", "benefit", "impact", "support", "public", "result", "important", "deadline"]
   };
   const terms = rules[audience] || rules.Citizen;
-
-  return facts
-    .map((fact, index) => {
-      const claim = String(fact?.claim || "");
-      const lower = claim.toLowerCase();
-      let score = 0;
-      for (const term of terms) if (lower.includes(term)) score += 3;
-      score += Math.max(0, 2 - index * 0.02);
-      return { fact, index, score };
-    })
-    .sort((a, b) => b.score - a.score)
-    .map(x => ({ ...x.fact, index: x.index }));
+  return facts.map((fact, index) => {
+    const claim = String(fact?.claim || "");
+    const lower = claim.toLowerCase();
+    let score = 0;
+    for (const term of terms) if (lower.includes(term)) score += 3;
+    score += Math.max(0, 2 - index * 0.02);
+    return { fact, index, score };
+  }).sort((a, b) => b.score - a.score).map(x => ({ ...x.fact, index: x.index }));
 }
 
 function audienceFactLimit(audience) {
-  return {
-    Citizen: 5,
-    Officer: 6,
-    Executive: 5,
-    Student: 5,
-    Media: 5,
-    "General Public": 5
-  }[audience] || 5;
+  return { Citizen: 5, Officer: 6, Executive: 5, Student: 5, Media: 5, "General Public": 5 }[audience] || 5;
 }
 
 function audienceHeading(audience) {
@@ -232,33 +253,21 @@ function toneIntroduction(tone, audience, outputType) {
 }
 
 function compactForChannel(text) {
-  return text
-    .split(/\n+/)
-    .filter(Boolean)
-    .map(line => line.replace(/^\s+/, "").trim())
-    .join("\n");
+  return text.split(/\n+/).filter(Boolean).map(line => line.replace(/^\s+/, "").trim()).join("\n");
 }
-
-function emailSubject(outputType, audience) {
-  return `${outputType} — ${audience} source update`;
-}
-
+function emailSubject(outputType, audience) { return `${outputType} — ${audience} source update`; }
 function shortChannelText(lead, sourceFacts, content) {
   const combined = `${lead} ${sourceFacts} ${content}`;
-  return combined.split(/\s+/).slice(0, 75).join(" ") + (combined.split(/\s+/).length > 75 ? " …" : "");
+  const words = combined.split(/\s+/);
+  return words.slice(0, 75).join(" ") + (words.length > 75 ? " …" : "");
 }
-
 function spoken(text) {
-  return String(text)
-    .replace(/\b[A-Z][A-Z /—-]{3,}\b/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return String(text).replace(/\b[A-Z][A-Z /—-]{3,}\b/g, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function enforceLength(content, facts, profile) {
   let text = String(content).trim();
   const words = countWords(text);
-
   if (words > profile.max) return trimAtWords(text, profile.max);
   if (words >= profile.min) return text;
 
@@ -269,35 +278,20 @@ function enforceLength(content, facts, profile) {
     if (!claim || claim.length < 8 || existing.includes(claim.toLowerCase())) continue;
     additions.push(`• ${claim} [${i + 1}]`);
   }
-
-  if (additions.length) {
-    const heading = "\n\nADDITIONAL SOURCE DETAILS\n";
-    text += heading + additions.join("\n");
-  }
-
+  if (additions.length) text += "\n\nADDITIONAL SOURCE DETAILS\n" + additions.join("\n");
   return countWords(text) > profile.max ? trimAtWords(text, profile.max) : text;
 }
-
-function countWords(text) {
-  return String(text).trim().split(/\s+/).filter(Boolean).length;
-}
-
+function countWords(text) { return String(text).trim().split(/\s+/).filter(Boolean).length; }
 function trimAtWords(text, maxWords) {
   const lines = String(text).trim().split(/\n+/);
   const kept = [];
   let total = 0;
-
   for (const line of lines) {
     const n = countWords(line);
     if (!n) continue;
-    if (total + n <= maxWords) {
-      kept.push(line);
-      total += n;
-      continue;
-    }
+    if (total + n <= maxWords) { kept.push(line); total += n; continue; }
     if (!kept.length) return String(text).trim().split(/\s+/).slice(0, maxWords).join(" ") + " …";
     break;
   }
-
   return kept.join("\n").trim();
 }
