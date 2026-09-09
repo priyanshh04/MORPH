@@ -1,8 +1,11 @@
 import { id, now } from "../database/store.js";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
+import { createWorker } from "tesseract.js";
 
 const STOP = new Set("the and for with from this that have will are was were has into shall should would could about above below where which when what who whom your their there here been being through using under over such not its also than then them they our out use can may per via a an as is of to in on at by or be it if how why does did do these those whose document source information table contents page".split(" "));
+const MAX_OCR_IMAGES = 20;
+const MAX_OCR_TEXT = 50000;
 
 export function normalizeText(text = "") {
   const raw = String(text).replace(/\r/g, "").replace(/\u00a0/g, " ");
@@ -20,17 +23,105 @@ function cleanLine(line) {
 
 export async function parseUploadedContent({ name = "Pasted source", type = "text/plain", content = "", encoding = "text" }) {
   const ext = name.split(".").pop()?.toLowerCase(); const supported = ["pdf","docx","txt","md","markdown"].includes(ext) || type.includes("text"); let clean = ""; let parser = "text-extractor";
+  let ocrImageCount = 0;
+  let ocrTextLength = 0;
   try {
     if (encoding === "base64") {
       const buffer = Buffer.from(String(content).replace(/^data:[^;]+;base64,/, ""), "base64");
-      if (ext === "pdf") { const p = new PDFParse({ data: buffer }); const parsed = await p.getText(); clean = normalizeText(parsed.text || ""); await p.destroy(); parser = "pdf-parse"; }
-      else if (ext === "docx") { const parsed = await mammoth.extractRawText({ buffer }); clean = normalizeText(parsed.value || ""); parser = "mammoth-docx"; }
+      if (ext === "pdf") {
+        const p = new PDFParse({ data: buffer });
+        try {
+          const parsed = await p.getText();
+          clean = normalizeText(parsed.text || "");
+          parser = "pdf-parse";
+          const ocr = await extractPdfImageText(p);
+          ocrImageCount = ocr.imageCount;
+          ocrTextLength = ocr.text.length;
+          if (ocr.text) {
+            clean = combineSourceAndOcr(clean, ocr.text);
+            parser = "pdf-parse+ocr";
+          }
+        } finally {
+          await p.destroy();
+        }
+      } else if (ext === "docx") { const parsed = await mammoth.extractRawText({ buffer }); clean = normalizeText(parsed.value || ""); parser = "mammoth-docx"; }
       else clean = normalizeText(buffer.toString("utf8"));
     } else clean = normalizeText(content);
   } catch (e) { throw new Error(`Could not parse ${ext || "document"}: ${e.message}`); }
   if (!clean) clean = demoBodyFor(name);
-  return { title: inferTitle(clean,name), text: clean, fileType: ext || "txt", supported, pages: Math.max(1,Math.ceil(clean.length/2600)), metadata:{originalName:name,mimeType:type,parser} };
+  return { title: inferTitle(clean,name), text: clean, fileType: ext || "txt", supported, pages: Math.max(1,Math.ceil(clean.length/2600)), metadata:{originalName:name,mimeType:type,parser,ocrImageCount,ocrTextLength,ocrEnabled:ext === "pdf" && encoding === "base64"} };
 }
+
+async function extractPdfImageText(parser) {
+  const empty = { text: "", imageCount: 0 };
+  if (!parser || typeof parser.getImage !== "function") return empty;
+  let imageResult;
+  try {
+    imageResult = await parser.getImage({ imageThreshold: 80, imageBuffer: true, imageDataUrl: false });
+  } catch (error) {
+    console.warn("PDF image extraction skipped:", error.message);
+    return empty;
+  }
+  const images = [];
+  for (let pageIndex = 0; pageIndex < (imageResult?.pages || []).length; pageIndex += 1) {
+    const page = imageResult.pages[pageIndex];
+    for (let imageIndex = 0; imageIndex < (page?.images || []).length; imageIndex += 1) {
+      if (images.length >= MAX_OCR_IMAGES) break;
+      const image = page.images[imageIndex];
+      if (!image?.data) continue;
+      const width = Number(image.width || 0);
+      const height = Number(image.height || 0);
+      if (width && height && (width < 120 || height < 80)) continue;
+      const data = Buffer.isBuffer(image.data) ? image.data : Buffer.from(image.data);
+      if (!data.length || data.length > 12 * 1024 * 1024) continue;
+      images.push({ data, page: pageIndex + 1, image: imageIndex + 1 });
+    }
+  }
+  if (!images.length) return empty;
+
+  const languages = String(process.env.MORPH_OCR_LANGS || "eng").trim() || "eng";
+  let worker;
+  try {
+    worker = await createWorker(languages);
+    const seen = new Set();
+    const sections = [];
+    let totalLength = 0;
+    for (const item of images) {
+      if (totalLength >= MAX_OCR_TEXT) break;
+      try {
+        const result = await worker.recognize(item.data);
+        const text = normalizeText(result?.data?.text || "");
+        if (!text || text.length < 8) continue;
+        const key = text.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const remaining = MAX_OCR_TEXT - totalLength;
+        const clipped = text.slice(0, remaining);
+        sections.push(`[IMAGE OCR — page ${item.page}, image ${item.image}]\n${clipped}`);
+        totalLength += clipped.length;
+      } catch (error) {
+        console.warn(`OCR skipped for PDF page ${item.page}, image ${item.image}:`, error.message);
+      }
+    }
+    return { text: sections.join("\n\n"), imageCount: images.length };
+  } catch (error) {
+    console.warn("PDF OCR unavailable:", error.message);
+    return empty;
+  } finally {
+    if (worker) {
+      try { await worker.terminate(); } catch { /* ignore OCR cleanup errors */ }
+    }
+  }
+}
+
+function combineSourceAndOcr(nativeText, ocrText) {
+  const native = normalizeText(nativeText);
+  const ocr = normalizeText(ocrText);
+  if (!ocr) return native;
+  if (!native) return ocr;
+  return `${native}\n\n${ocr}`;
+}
+
 function inferTitle(text,name){const first=text.split("\n").map(x=>x.trim()).find(Boolean);return first&&first.length<160?first.replace(/^#+\s*/,""):name.replace(/\.[^.]+$/,"");}
 function demoBodyFor(name){if(/alert|weather|disaster/i.test(name))return"District Disaster Management Authority Cyclone Preparedness Alert\nIssued on 20 September 2026 for coastal blocks. Citizens in low-lying areas must move to shelters by 6 PM. Emergency helpline 1077 will operate continuously. Fishing activity is suspended until 22 September 2026. Schools remain closed on 21 September 2026.";if(/education|policy/i.test(name))return"Education Department Digital Learning Policy 2026\nThe policy provides tablets to students of classes 9 to 12. Schools must complete beneficiary verification by 15 October 2026. Budget allocation is INR 10 crore for phase one.";return"Source document 2026\nThe Department launched the program on 1 August 2026. Eligible households may apply. Applications close on 20 September 2026. The program provides a one-time benefit of INR 10,000.";}
 
@@ -42,7 +133,7 @@ function detectSection(text,i){if(i===0)return"Title / Overview";if(/eligib|qual
 export function analyzeDocument(doc,chunks){const text=normalizeText(doc.text);const sentences=splitSentences(text).map(s=>s.trim()).filter(isUsableClaim);const facts=rankClaims(sentences).slice(0,60).map((claim,idx)=>{const owning=findBestChunk(claim,chunks);return{id:id("fact"),documentId:doc.id,claim,citationId:`C${idx+1}`,page:owning?.page||1,section:owning?.section||"Source",confidence:factConfidence(claim),createdAt:now()};});const entities=extractEntities(text,doc.id);const dates=uniqueMatches(text,/\b(?:\d{1,2}\s+)?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+20\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b|\b(?:19|20)\d{2}\b/gi);const numbers=uniqueMatches(text,/(?:(?:INR|USD|EUR|GBP|₹|\$|€|£)\s?[-+]?\d[\d,]*(?:\.\d+)?(?:\s?(?:crore|lakh|million|billion|thousand))?|\b[-+]?\d[\d,]*(?:\.\d+)?\s?(?:crore|lakh|million|billion|thousand|%|days|units?|items?|orders?|sales|reviews?|stars?)\b)/gi);return{facts,entities,intelligence:{wordCount:text.split(/\s+/).filter(Boolean).length,pages:doc.pages,detectedLanguage:/[\u0900-\u097F]/.test(text)?"Hindi / Indic":"English",claimCount:facts.length,entityCount:entities.length,citationCount:(text.match(/\[\d+\]/g)||[]).length||Math.min(5,facts.length),topics:topTerms(text).slice(0,12),dates,numbers,risks:facts.filter(f=>/risk|urgent|alert|emergency|must|deadline|suspended|closed/i.test(f.claim)).slice(0,8).map(f=>f.claim)}};}
 function isUsableClaim(s){const t=String(s).replace(/\s+/g," ").trim();return t.length>=20&&t.length<=1200&&!/^[\d\s.,:;\-–—]+$/.test(t)&&!/^\s*(?:table of contents|contents|page|chapter)\b/i.test(t)&&!/\.\.\.\s*\d+$/i.test(t);}
 function rankClaims(sentences){const seen=new Set();return sentences.map((s,i)=>({s,i,score:claimScore(s)})).sort((a,b)=>b.score-a.score||a.i-b.i).filter(x=>{const k=normalizeText(x.s);if(seen.has(k))return false;seen.add(k);return true;}).map(x=>x.s);}
-function claimScore(s){let n=5;if(/\b(?:19|20)\d{2}\b|\d[/-]\d|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b/i.test(s))n+=5;if(/INR|USD|EUR|GBP|₹|\$|€|£|crore|lakh|%|amount|budget|benefit|fund|revenue|sales|profit|price|cost|rating|score/i.test(s))n+=5;if(/must|shall|required|eligible|apply|submit|deadline|provides?|launched|released|announced|introduced|directed|written|sold|purchased/i.test(s))n+=5;if(/\.\.\.|·|•/.test(s))n-=20;return n;}
+function claimScore(s){let n=5;if(/\b(?:19|20)\d{2}\b|\d[/-]\d|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b/i.test(s))n+=5;if(/INR|USD|EUR|GBP|₹|\$|€|£|crore|lakh|%|amount|budget|benefit|fund|revenue|sales|profit|price|cost|rating|score/i.test(s))n+=5;if(/must|shall|required|eligible|apply|submit|deadline|budget|launched|released|sold|purchased/i.test(s))n+=5;if(/\.\.\.|·|•/.test(s))n-=20;return n;}
 function factConfidence(s){return /\d|must|shall|eligible|deadline|budget|launched|released|sold|price|rating/i.test(s)?0.95:0.88;}
 function findBestChunk(claim,chunks){const terms=tokenize(claim);let best=chunks[0],bestScore=-1;for(const chunk of chunks){const ct=tokenize(chunk.text);const n=[...terms].reduce((sum,t)=>sum+(ct.has(t)?1:0),0);if(n>bestScore){bestScore=n;best=chunk;}}return best;}
 function extractEntities(text,documentId){const m=[...text.matchAll(/\b(?:[A-Z][a-z]+|[A-Z]{2,})(?:\s+(?:[A-Z][a-z]+|[A-Z]{2,})){0,5}\b/g)].map(x=>x[0]).filter(x=>x.length>2&&!/^(The|This|That|When|What|Where|Which|Issued|Section|Source|Table|Contents)$/.test(x));return[...new Set(m)].slice(0,40).map(name=>({id:id("entity"),documentId,name,type:classifyEntity(name),createdAt:now()}));}
