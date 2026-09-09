@@ -22,7 +22,9 @@ const LANG = {
 };
 
 const HINGLISH = "Hinglish";
-const MAX_CHUNK = 850;
+// MyMemory has a 500-character query limit. Keep a safer margin because
+// protected citation/number tokens can expand the text before it is sent.
+const MAX_CHUNK = 350;
 
 DemoAIProvider.prototype.transform = async function (args) {
   const result = await originalTransform.call(this, args);
@@ -48,10 +50,7 @@ async function translateArtifact(text, language) {
   const chunks = splitForTranslation(protectedText);
   const translated = [];
 
-  for (const chunk of chunks) {
-    translated.push(await translateChunk(chunk, language));
-  }
-
+  for (const chunk of chunks) translated.push(await translateChunk(chunk, language));
   return restoreTokens(translated.join("\n"));
 }
 
@@ -64,12 +63,24 @@ async function translateShort(text, language) {
 async function translateChunk(text, language) {
   if (!text.trim()) return text;
   if (language === HINGLISH) {
-    // Hindi translation followed by Roman-script transliteration gives the
-    // user Hinglish rather than Hindi Devanagari.
-    const hindi = await memorySafeTranslate(text, "hi");
+    const hindi = await translateWithRetry(text, "hi");
     return transliterateHindi(hindi);
   }
-  return memorySafeTranslate(text, LANG[language]);
+  return translateWithRetry(text, LANG[language]);
+}
+
+async function translateWithRetry(text, target) {
+  try {
+    return await memorySafeTranslate(text, target);
+  } catch (error) {
+    // Never expose a provider error as generated content. If a provider still
+    // rejects a safe chunk, split it further and retry the smaller pieces.
+    if (text.length <= 180) throw error;
+    const parts = splitTextSafely(text, 180);
+    const translated = [];
+    for (const part of parts) translated.push(await memorySafeTranslate(part, target));
+    return translated.join(" ");
+  }
 }
 
 async function memorySafeTranslate(text, target) {
@@ -86,8 +97,8 @@ async function memorySafeTranslate(text, target) {
 
   const data = await response.json();
   const translated = String(data?.responseData?.translatedText || "").trim();
-  if (!translated || /MYMEMORY WARNING/i.test(translated)) {
-    throw new Error("translation service returned no usable translation");
+  if (!translated || /MYMEMORY WARNING|QUERY LENGTH LIMIT EXCEEDED/i.test(translated)) {
+    throw new Error("translation service returned a query-limit or unusable response");
   }
   return translated;
 }
@@ -125,16 +136,23 @@ function splitForTranslation(text) {
       current = line;
       continue;
     }
-    const sentences = line.match(/.{1,800}(?:\s+|$)/g) || [line];
+    chunks.push(...splitTextSafely(line, MAX_CHUNK));
     current = "";
-    for (const part of sentences) {
-      if (part.length <= MAX_CHUNK) chunks.push(part);
-      else {
-        for (let i = 0; i < part.length; i += MAX_CHUNK) chunks.push(part.slice(i, i + MAX_CHUNK));
-      }
-    }
   }
   if (current) chunks.push(current);
+  return chunks;
+}
+
+function splitTextSafely(text, maxLength) {
+  const chunks = [];
+  let remaining = String(text);
+  while (remaining.length > maxLength) {
+    let cut = remaining.lastIndexOf(" ", maxLength);
+    if (cut < Math.floor(maxLength * 0.55)) cut = maxLength;
+    chunks.push(remaining.slice(0, cut).trim());
+    remaining = remaining.slice(cut).trimStart();
+  }
+  if (remaining) chunks.push(remaining);
   return chunks;
 }
 
