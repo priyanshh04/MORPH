@@ -1,8 +1,8 @@
-# TransformAI
+# MORPH
 
 **SIH26154 - GenAI Platform for Automated Content Transformation**
 
-TransformAI is a government/enterprise-grade AI content transformation platform for converting one trusted source into many audience-specific, language-specific, and channel-specific communication artifacts while preserving context, facts, and citations.
+MORPH is a government/enterprise-grade AI content transformation platform for converting one trusted source into many audience-specific, language-specific, and channel-specific communication artifacts while preserving context, facts, and citations.
 
 Tagline: **One Source. Every Audience. Every Format.**
 
